@@ -50,7 +50,7 @@ try:
                 else:
                     st.caption(f"{ticker}: Sin datos")
         
-        st.divider()
+        st.write("---")
         st.info("💡 Consejo: Las acciones en verde están 'fuertes' técnicamente.")
     else:
         st.error("No se han podido cargar los datos de Yahoo Finance.")
