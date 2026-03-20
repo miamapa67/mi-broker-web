@@ -4,7 +4,7 @@ import pandas as pd
 from PIL import Image
 import os
 
-st.set_page_config(page_title="Miguel Terminal 360", layout="wide")
+st.set_page_config(page_title="Miguel Terminal IBEX 35", layout="wide")
 
 # Estilo Blanco Nítido
 st.markdown("<style>.stApp { background-color: #ffffff; }</style>", unsafe_allow_html=True)
@@ -14,77 +14,77 @@ if os.path.exists("logo_miguel.png"):
     img = Image.open("logo_miguel.png")
     st.image(img, use_column_width=True)
 
-st.title("🏹 Terminal 360 - MIGUEL")
-st.write("Semáforo de Inversión + Dividendos + Radar de Noticias.")
+st.title("🏹 Terminal IBEX 35 Completa - MIGUEL")
+st.write("Análisis en tiempo real de los 35 valores del índice español.")
 
-# --- 2. MOTOR DE ANÁLISIS TOTAL ---
-tickers = ["SAN.MC", "BBVA.MC", "TEF.MC", "IBE.MC", "ITX.MC", "REP.MC", "CABK.MC", "SAB.MC", "GRF.MC"]
+# --- 2. LISTA COMPLETA IBEX 35 (OFICIAL) ---
+ibex_35 = [
+    "ANA.MC", "ACX.MC", "ACS.MC", "AENA.MC", "AMS.MC", "MTS.MC", "SAB.MC", "SAN.MC", "BKT.MC", "BBVA.MC",
+    "CABK.MC", "CLNX.MC", "ENG.MC", "ELE.MC", "FER.MC", "FDR.MC", "GRF.MC", "IAG.MC", "IBE.MC", "ITX.MC",
+    "IDR.MC", "COL.MC", "LOG.MC", "MAP.MC", "MEL.MC", "MRL.MC", "NTGY.MC", "PUIG.MC", "REE.MC", "REP.MC",
+    "ROVI.MC", "SCYR.MC", "SLBA.MC", "TEF.MC", "UNI.MC"
+]
 
-if st.button('🚀 EJECUTAR ANÁLISIS COMPLETO', use_container_width=True):
-    st.subheader("📊 Panel de Oportunidades")
+if st.button('🚀 ESCANEAR LOS 35 VALORES AHORA', use_container_width=True):
+    st.subheader("📊 Mapa del Mercado Español")
     
-    with st.spinner('Calculando señales y dividendos...'):
-        for t in tickers:
+    # Creamos 3 columnas para organizar los 35 valores
+    cols = st.columns(3)
+    
+    with st.spinner('Procesando toda la bolsa española...'):
+        for i, t in enumerate(ibex_35):
             try:
                 tk = yf.Ticker(t)
-                # Necesitamos 3 meses para el RSI
                 hist = tk.history(period="3mo")
                 if hist.empty: continue
                 
                 precio_actual = float(hist['Close'].iloc[-1])
                 
-                # --- CÁLCULO DEL SEMÁFORO (RSI) ---
+                # --- SEMÁFORO (RSI) ---
                 delta = hist['Close'].diff()
                 gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                 loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
                 rs = gain / loss
                 rsi_val = 100 - (100 / (1 + rs.iloc[-1]))
                 
-                if rsi_val > 70: color, est = "#fef2f2", "🔴 PELIGRO (CARO)"
-                elif rsi_val < 30: color, est = "#f0fdf4", "🟢 OPORTUNIDAD (COMPRA)"
+                if rsi_val > 70: color, est = "#fef2f2", "🔴 CARO"
+                elif rsi_val < 30: color, est = "#f0fdf4", "🟢 COMPRA"
                 else: color, est = "#f8fafc", "⚪ NEUTRO"
 
-                # --- BUSCAR DIVIDENDO ---
+                # --- DIVIDENDO ---
                 div_yield = tk.info.get('dividendYield', 0)
                 if not div_yield:
                     divs = tk.dividends
                     if not divs.empty: div_yield = (divs.iloc[-1] * 2) / precio_actual 
                 div_final = (div_yield * 100) if div_yield else 0
 
-                # --- NOTICIAS ---
-                nombre_corto = t.split('.')[0]
-                link_noticias = f"https://www.google.com/search?q={nombre_corto}+noticias+bolsa&tbm=nws"
-
-                # MOSTRAR TARJETA
-                with st.expander(f"📉 {t}: {precio_actual:.2f}€ | {est}", expanded=True):
-                    c1, c2 = st.columns([1, 1.5])
-                    with c1:
-                        st.metric("Precio", f"{precio_actual:.2f}€")
-                        st.write(f"**RSI (Riesgo):** {rsi_val:.1f}")
+                # --- MOSTRAR EN COLUMNAS ---
+                with cols[i % 3]:
+                    with st.expander(f"{t}: {precio_actual:.2f}€ | {est}"):
+                        st.write(f"**RSI:** {rsi_val:.1f}")
                         if div_final > 0:
-                            st.markdown(f"<span style='color:green;'><b>💰 Dividendo: {div_final:.2f}%</b></span>", unsafe_allow_html=True)
-                    
-                    with c2:
-                        st.write("**📰 Información y Noticias:**")
-                        st.markdown(f"• [👉 Ver Noticias de {nombre_corto}]({link_noticias})")
-                        st.markdown(f"• [📊 Gráfico Real en Google Finance](https://www.google.com/finance/quote/{t.replace('.MC', ':BME')})")
+                            st.markdown(f"<span style='color:green;'>💰 Div: {div_final:.2f}%</span>", unsafe_allow_html=True)
+                        
+                        nombre_n = t.split('.')[0]
+                        st.markdown(f"[📰 Noticias]({https://www.google.com/search?q={nombre_n}+noticias+bolsa&tbm=nws}) | [📊 Gráfico](https://www.google.com/finance/quote/{t.replace('.MC', ':BME')})")
 
             except: continue
+    st.success("¡Escaneo de los 35 valores completado!")
 
 st.divider()
 
 # --- 3. CALCULADORA ---
-st.subheader("💰 Simulador de Ganancia Neta")
+st.subheader("💰 Simulador de Inversión")
 c1, c2 = st.columns(2)
 with c1:
-    inver = st.number_input("Dinero a invertir (€):", value=1000, step=500)
-    acc_elegida = st.selectbox("Acción:", tickers)
-    sub_obj = st.slider("Subida esperada (%)", 1, 30, 5)
+    inver = st.number_input("Capital (€):", value=1000, step=500)
+    acc_elegida = st.selectbox("Valor IBEX:", ibex_35)
+    sub_obj = st.slider("Subida objetivo (%)", 1, 30, 5)
 
 with c2:
     try:
         p_v = float(yf.Ticker(acc_elegida).history(period="1d")['Close'].iloc[-1])
         n_acc = int(inver / p_v)
-        gan_estimada = (p_v * (sub_obj/100)) * n_acc
-        st.success(f"**Resultado: Ganarías +{gan_estimada:.2f}€**")
-    except: st.write("Calculando...")
+        gan = (p_v * (sub_obj/100)) * n_acc
+        st.success(f"**Ganancia: +{gan:.2f}€**")
+    except: st.write("Selecciona un valor...")
