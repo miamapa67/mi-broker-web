@@ -15,9 +15,9 @@ if os.path.exists("logo_miguel.png"):
     st.image(img, use_column_width=True)
 
 st.title("🏹 Terminal IBEX 35 Completa - MIGUEL")
-st.write("Análisis en tiempo real de los 35 valores del índice español.")
+st.write("Análisis de los 35 valores: Semáforo RSI, Dividendos y Radar de Prensa.")
 
-# --- 2. LISTA COMPLETA IBEX 35 (OFICIAL) ---
+# --- 2. LISTA COMPLETA IBEX 35 ---
 ibex_35 = [
     "ANA.MC", "ACX.MC", "ACS.MC", "AENA.MC", "AMS.MC", "MTS.MC", "SAB.MC", "SAN.MC", "BKT.MC", "BBVA.MC",
     "CABK.MC", "CLNX.MC", "ENG.MC", "ELE.MC", "FER.MC", "FDR.MC", "GRF.MC", "IAG.MC", "IBE.MC", "ITX.MC",
@@ -25,13 +25,11 @@ ibex_35 = [
     "ROVI.MC", "SCYR.MC", "SLBA.MC", "TEF.MC", "UNI.MC"
 ]
 
-if st.button('🚀 ESCANEAR LOS 35 VALORES AHORA', use_container_width=True):
-    st.subheader("📊 Mapa del Mercado Español")
+if st.button('🚀 ESCANEAR LOS 35 VALORES Y NOTICIAS', use_container_width=True):
+    st.subheader("📊 Mapa del Mercado en Tiempo Real")
+    cols = st.columns(3) # Dividimos en 3 columnas para que quepa todo bien
     
-    # Creamos 3 columnas para organizar los 35 valores
-    cols = st.columns(3)
-    
-    with st.spinner('Procesando toda la bolsa española...'):
+    with st.spinner('Conectando con la Bolsa de Madrid...'):
         for i, t in enumerate(ibex_35):
             try:
                 tk = yf.Ticker(t)
@@ -47,9 +45,9 @@ if st.button('🚀 ESCANEAR LOS 35 VALORES AHORA', use_container_width=True):
                 rs = gain / loss
                 rsi_val = 100 - (100 / (1 + rs.iloc[-1]))
                 
-                if rsi_val > 70: color, est = "#fef2f2", "🔴 CARO"
-                elif rsi_val < 30: color, est = "#f0fdf4", "🟢 COMPRA"
-                else: color, est = "#f8fafc", "⚪ NEUTRO"
+                if rsi_val > 70: est = "🔴 CARO"
+                elif rsi_val < 30: est = "🟢 COMPRA"
+                else: est = "⚪ NEUTRO"
 
                 # --- DIVIDENDO ---
                 div_yield = tk.info.get('dividendYield', 0)
@@ -63,13 +61,19 @@ if st.button('🚀 ESCANEAR LOS 35 VALORES AHORA', use_container_width=True):
                     with st.expander(f"{t}: {precio_actual:.2f}€ | {est}"):
                         st.write(f"**RSI:** {rsi_val:.1f}")
                         if div_final > 0:
-                            st.markdown(f"<span style='color:green;'>💰 Div: {div_final:.2f}%</span>", unsafe_allow_html=True)
+                            st.markdown(f"<span style='color:green;'>💰 <b>Div: {div_final:.2f}%</b></span>", unsafe_allow_html=True)
                         
+                        # --- RADAR DE NOTICIAS (CORREGIDO) ---
                         nombre_n = t.split('.')[0]
-                        st.markdown(f"[📰 Noticias]({https://www.google.com/search?q={nombre_n}+noticias+bolsa&tbm=nws}) | [📊 Gráfico](https://www.google.com/finance/quote/{t.replace('.MC', ':BME')})")
+                        url_news = f"https://www.google.com/search?q={nombre_n}+noticias+bolsa&tbm=nws"
+                        url_grafico = f"https://www.google.com/finance/quote/{t.replace('.MC', ':BME')}"
+                        
+                        st.markdown(f"**📰 Radar de Noticias:**")
+                        st.markdown(f"[👉 Leer últimas noticias de {nombre_n}]({url_news})")
+                        st.markdown(f"[📊 Ver gráfico interactivo]({url_grafico})")
 
             except: continue
-    st.success("¡Escaneo de los 35 valores completado!")
+    st.success("¡Análisis de los 35 valores finalizado!")
 
 st.divider()
 
@@ -78,13 +82,12 @@ st.subheader("💰 Simulador de Inversión")
 c1, c2 = st.columns(2)
 with c1:
     inver = st.number_input("Capital (€):", value=1000, step=500)
-    acc_elegida = st.selectbox("Valor IBEX:", ibex_35)
+    acc_elegida = st.selectbox("Selecciona valor:", ibex_35)
     sub_obj = st.slider("Subida objetivo (%)", 1, 30, 5)
-
 with c2:
     try:
         p_v = float(yf.Ticker(acc_elegida).history(period="1d")['Close'].iloc[-1])
         n_acc = int(inver / p_v)
         gan = (p_v * (sub_obj/100)) * n_acc
-        st.success(f"**Ganancia: +{gan:.2f}€**")
-    except: st.write("Selecciona un valor...")
+        st.success(f"**Ganancia estimada: +{gan:.2f}€**")
+    except: st.info("Selecciona un valor del IBEX")
