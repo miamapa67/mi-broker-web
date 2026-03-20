@@ -5,10 +5,12 @@ import pandas as pd
 # Configuración de página
 st.set_page_config(page_title="Analista Robot Pro", layout="wide")
 
-# Estilo CSS Corregido
+# Estilo CSS de lujo (Copia y pega este bloque sobre el anterior)
 st.markdown("""
     <style>
-    .stMetric { background-color: #161b22; border: 1px solid #30363d; padding: 15px; border-radius: 10px; }
+    .stMetric { background-color: #1e2229; border: 1px solid #3e4451; padding: 20px; border-radius: 15px; }
+    [data-testid="stMetricValue"] { color: #ffffff !important; font-size: 32px; }
+    [data-testid="stMetricLabel"] { color: #8b949e !important; }
     </style>
     """, unsafe_allow_html=True)
 
