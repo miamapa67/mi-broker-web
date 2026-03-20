@@ -5,25 +5,58 @@ import pandas as pd
 # Configuración de página
 st.set_page_config(page_title="Radar de Inversión Pro", layout="wide")
 
-# Estilo CSS de lujo
+# --- NUEVO ESTILO CSS PARA MÁXIMA LEGIBILIDAD ---
 st.markdown("""
     <style>
+    /* Fondo general oscuro para que resalten las tarjetas */
     .stApp { background-color: #0e1117; }
-    .stMetric { background-color: #161b22; border: 1px solid #30363d; padding: 15px; border-radius: 12px; }
-    [data-testid="stMetricValue"] { color: #ffffff !important; font-size: 28px; }
-    h1, h2, h3 { color: white !important; }
+    
+    /* Títulos principales en blanco puro */
+    h1, h2, h3 { color: #ffffff !important; font-weight: 700; }
+    
+    /* --- ESTILO DE LAS TARJETAS DEL RADAR (CLARAS) --- */
+    [data-testid="stMetric"] {
+        background-color: #f0f2f6; /* Fondo gris muy claro */
+        border: 1px solid #d1d5db;
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+    
+    /* Texto de la etiqueta (Ticker) en negro */
+    [data-testid="stMetricLabel"] {
+        color: #111827 !important;
+        font-size: 16px !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Texto del valor (Precio) en negro */
+    [data-testid="stMetricValue"] {
+        color: #000000 !important;
+        font-size: 32px !important;
+        font-weight: 800 !important;
+    }
+    
+    /* Ajuste para el delta (porcentaje) si lo hubiera */
+    [data-testid="stMetricDelta"] {
+        font-weight: 700 !important;
+    }
+
+    /* Estilo para el buscador individual (mantenemos oscuro para contraste) */
+    .stTextInput>div>div>input { background-color: #161b22; color: white; border: 1px solid #30363d; }
+    
     </style>
     """, unsafe_allow_html=True)
 
 st.title("📡 Radar de Oportunidades")
 
-# --- SECCIÓN 1: EL RADAR AUTOMÁTICO ---
+# --- SECCIÓN 1: EL RADAR AUTOMÁTICO (Súper Legible) ---
 st.subheader("Análisis Automático de Favoritos")
 favoritos = ["SAN.MC", "BBVA.MC", "TEF.MC", "IBE.MC", "TSLA"]
 
 cols_radar = st.columns(len(favoritos))
 
-for i, f in enumerate(favoritos): # <-- AQUÍ ESTABA EL ERROR, YA ESTÁ CORREGIDO ('in')
+for i, f in enumerate(favoritos):
     try:
         # Descarga rápida
         d = yf.download(f, period="1mo", progress=False)
@@ -32,7 +65,10 @@ for i, f in enumerate(favoritos): # <-- AQUÍ ESTABA EL ERROR, YA ESTÁ CORREGID
             p_media = float(d['Close'].tail(20).mean())
             
             with cols_radar[i]:
-                st.metric(label=f, value=f"{p_actual:.2f}€")
+                # Mostramos la métrica con el nuevo estilo claro
+                st.metric(label=f"Ticker: {f}", value=f"{p_actual:.2f}€")
+                
+                # Semáforo visual debajo de la tarjeta
                 if p_actual > p_media:
                     st.success("🟢 COMPRA")
                 else:
@@ -57,7 +93,9 @@ if ticker:
             
             c1, c2 = st.columns([1, 3])
             with c1:
+                # Métrica individual (mantenemos estilo claro aquí también para consistencia)
                 st.metric(label=f"Precio Actual {ticker}", value=f"{actual:.2f}€", delta=f"{distancia:.2f}%")
+                
                 if actual > media_20:
                     st.success("🎯 SEÑAL: COMPRA")
                 else:
@@ -67,4 +105,3 @@ if ticker:
                 st.line_chart(precios, color="#FF4B4B")
     except:
         st.error("Conectando con Yahoo...")
-        
