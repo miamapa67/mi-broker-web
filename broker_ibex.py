@@ -4,14 +4,7 @@ import pandas as pd
 
 st.set_page_config(page_title="Analista Robot Pro", layout="wide")
 
-# --- ESTILOS PERSONALIZADOS ---
-st.markdown("""
-    <style>
-    .stMetric { background-color: #f0f2f6; padding: 10px; border-radius: 10px; }
-    </style>
-    """, unsafe_allow_html=True)
-
-st.title("🤖 Analista Robot Pro - Inteligencia de Mercado")
+st.title("🤖 Analista Robot Pro")
 
 # --- BARRA LATERAL ---
 with st.sidebar:
@@ -20,62 +13,65 @@ with st.sidebar:
     st.write("---")
     st.caption("Datos reales de Yahoo Finance")
 
+# --- MODO 2: BUSCADOR INDIVIDUAL (Corregido y reforzado) ---
+if modo == "Buscador Individual":
+    st.subheader("🔎 Análisis Detallado")
+    t = st.text_input("Ticker (ej: NVDA, TSLA, SAN.MC):", value="SAN.MC").upper().strip()
+    
+    if t:
+        try:
+            # Usamos un método de descarga más estable
+            ticker_obj = yf.Ticker(t)
+            hist = ticker_obj.history(period="1y")
+            
+            if not hist.empty:
+                d = hist['Close']
+                c1, c2 = st.columns([1, 3])
+                with c1:
+                    actual = float(d.iloc[-1])
+                    # Media de los últimos 20 días de cierre
+                    media_val = float(d.tail(20).mean())
+                    st.metric("Precio Actual", f"{actual:.2f}")
+                    
+                    diff = ((actual/media_val)-1)*100
+                    st.write(f"Vs Media 20d: {diff:.2f}%")
+                    
+                    status = "COMPRA ✅" if actual > media_val else "VENTA ❌"
+                    color = "green" if actual > media_val else "red"
+                    st.markdown(f"### **<span style='color:{color}'>{status}</span>**", unsafe_allow_html=True)
+                with c2:
+                    st.line_chart(d)
+            else:
+                st.warning(f"No hay datos para {t}. ¿Has puesto bien el punto? Ej: SAN.MC")
+        except Exception as e:
+            st.error(f"Error de conexión: Yahoo está saturado. Reintenta en 10 segundos.")
+
 # --- MODO 1: MONITOR GENERAL ---
-if modo == "Monitor General":
+elif modo == "Monitor General":
     st.subheader("🇪🇸 Semáforo del IBEX 35")
     ibex_35 = ["ANA.MC", "ACS.MC", "ACG.MC", "AENA.MC", "AMS.MC", "MTS.MC", "SAB.MC", "SAN.MC", "BKT.MC", "BBVA.MC", "CABK.MC", "CLNX.MC", "ENG.MC", "ELE.MC", "FER.MC", "FDR.MC", "GRF.MC", "IAG.MC", "IBE.MC", "ITX.MC", "IDR.MC", "COL.MC", "LOG.MC", "MAP.MC", "MEL.MC", "MRL.MC", "NTGY.MC", "PUIG.MC", "REE.MC", "REP.MC", "ROVI.MC", "SCYR.MC", "SLR.MC", "TEF.MC", "UNI.MC"]
-    
     try:
-        data_ibex = yf.download(ibex_35, period="40d")['Close']
+        data_ibex = yf.download(ibex_35, period="1mo")['Close']
         cols = st.columns(5)
         for i, ticker in enumerate(ibex_35):
             with cols[i % 5]:
                 serie = data_ibex[ticker].dropna()
                 if not serie.empty:
-                    act = float(serie.iloc[-1]) # Forzamos a número
-                    med = float(serie.tail(20).mean())
-                    alc = act > med
-                    status = "COMPRA" if alc else "VENTA"
-                    color = "green" if alc else "red"
-                    st.markdown(f"**{ticker.replace('.MC','')}**")
-                    st.markdown(f"<span style='color:{color}; font-weight:bold;'>{status}</span>", unsafe_allow_html=True)
+                    act = float(serie.iloc[-1]); med = float(serie.tail(20).mean())
+                    color = "green" if act > med else "red"
+                    st.markdown(f"**{ticker.replace('.MC','')}** : <span style='color:{color}'>{'OK' if act > med else 'BAJA'}</span>", unsafe_allow_html=True)
                     st.metric(label="Precio", value=f"{act:.2f}€", delta=f"{((act/med)-1)*100:.1f}%")
-    except: st.error("Cargando datos del IBEX...")
+    except: st.write("Refrescando monitor...")
 
-# --- MODO 2: BUSCADOR INDIVIDUAL ---
-elif modo == "Buscador Individual":
-    st.subheader("🔎 Análisis Detallado")
-    t = st.text_input("Ticker (ej: NVDA, TSLA, SAN.MC):", value="SAN.MC").upper().strip()
-    if t:
-        try:
-            d = yf.download(t, period="1y")['Close']
-            if not d.empty:
-                d = d.dropna()
-                c1, c2 = st.columns([1, 3])
-                with c1:
-                    actual = float(d.iloc[-1]) # Convertimos a float para evitar el TypeError
-                    media_val = float(d.tail(20).mean())
-                    st.metric("Precio Actual", f"{actual:.2f}")
-                    st.write(f"Varia. vs media: {((actual/media_val)-1)*100:.2f}%")
-                with c2:
-                    st.line_chart(d)
-            else: st.warning("No se encontraron datos.")
-        except: st.error("Error al buscar este símbolo.")
-
-# --- MODO 3: DUELO DE ACCIONES ---
+# --- MODO 3: DUELO ---
 elif modo == "Duelo de Acciones":
-    st.subheader("⚔️ Duelo de Rentabilidad")
-    col_a, col_b = st.columns(2)
-    with col_a: t1 = st.text_input("Acción 1:", value="SAN.MC").upper().strip()
-    with col_b: t2 = st.text_input("Acción 2:", value="BBVA.MC").upper().strip()
-    
+    st.subheader("⚔️ Duelo")
+    t1 = st.text_input("Acción 1:", value="SAN.MC").upper().strip()
+    t2 = st.text_input("Acción 2:", value="BBVA.MC").upper().strip()
     if t1 and t2:
-        try:
-            df = yf.download([t1, t2], period="6mo")['Close']
-            if not df.empty:
-                df_norm = (df / df.iloc[0]) * 100
-                st.line_chart(df_norm)
-                st.info("Gráfica normalizada (Base 100)")
-        except: st.error("Error en el duelo.")
+        df = yf.download([t1, t2], period="6mo")['Close']
+        if not df.empty:
+            st.line_chart((df / df.iloc[0]) * 100)
+           
    
    
