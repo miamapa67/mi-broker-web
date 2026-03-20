@@ -2,27 +2,49 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 
+# Configuración para móvil y PC
 st.set_page_config(page_title="Analista Robot Pro", layout="wide")
+
 st.title("🤖 Analista Robot Pro")
 
-ticker = st.text_input("Introduce un Ticker (ej: SAN.MC):", value="SAN.MC").upper().strip()
+# Buscador de acciones
+ticker = st.text_input("Introduce Ticker (ej: SAN.MC, BBVA.MC, NVDA):", value="SAN.MC").upper().strip()
 
 if ticker:
     try:
-        # Usamos Ticker() en lugar de download() directo, es más estable
+        # Pedimos datos de los últimos 6 meses
         t = yf.Ticker(ticker)
         data = t.history(period="6mo")
         
         if not data.empty:
-            ultimo_precio = float(data['Close'].iloc[-1])
-            col1, col2 = st.columns([1, 3])
+            # Cálculos del Semáforo
+            precio_actual = float(data['Close'].iloc[-1])
+            media_20 = float(data['Close'].tail(20).mean()) # Media de los últimos 20 días
+            
+            # Columnas para el diseño
+            col1, col2 = st.columns([1, 2])
+            
             with col1:
-                st.metric(label=f"Precio {ticker}", value=f"{ultimo_precio:.2f}€")
-                st.success("Conexión privada establecida")
+                st.metric(label="Precio Actual", value=f"{precio_actual:.2f}€")
+                
+                # Lógica del Semáforo
+                if precio_actual > media_20:
+                    st.success("🟢 SEÑAL: COMPRA")
+                    st.write("El precio está en racha alcista.")
+                else:
+                    st.error("🔴 SEÑAL: VENTA")
+                    st.write("El precio está en racha bajista.")
+                
+                distancia = ((precio_actual / media_20) - 1) * 100
+                st.info(f"Distancia a la media: {distancia:.2f}%")
+            
             with col2:
-                # Dibujamos con área para que se vea mejor
+                # Gráfica interactiva
                 st.area_chart(data['Close'])
+                st.caption("Evolución de los últimos 6 meses")
+                
         else:
-            st.warning("Yahoo está tardando en soltar los datos. Espera 30 segundos y pulsa Intro.")
+            st.warning("No hay datos. Asegúrate de poner el punto en las españolas (ej: TEF.MC)")
+            
     except Exception as e:
-        st.error("Límite de peticiones alcanzado. Descansando 1 minuto...")
+        st.error("Yahoo está saturado. Espera 10 segundos y pulsa Intro.")
