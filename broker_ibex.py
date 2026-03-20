@@ -5,85 +5,102 @@ import numpy as np
 from PIL import Image
 import os
 
-st.set_page_config(page_title="Miguel - Radar de Dividendos", layout="wide")
+# Configuración de página
+st.set_page_config(page_title="Miguel - Terminal Financiero Pro", layout="wide")
 
-# Estilo blanco limpio
-st.markdown("<style>.stApp { background-color: #ffffff; }</style>", unsafe_allow_html=True)
+# Diseño Modo Claro Profesional
+st.markdown("""
+    <style>
+    .stApp { background-color: #ffffff; }
+    .card { padding: 20px; border-radius: 12px; margin-bottom: 15px; border-left: 8px solid; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    .compra { background-color: #f0fdf4; border-left-color: #22c55e; color: #166534; }
+    .venta { background-color: #fef2f2; border-left-color: #ef4444; color: #991b1b; }
+    .badge { background-color: #1e293b; color: white; padding: 3px 8px; border-radius: 5px; font-size: 11px; margin-right: 5px; }
+    h1, h2, h3, h4 { color: #1e293b !important; font-family: 'Segoe UI'; }
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- 1. CABECERA CON TU LOGO ---
 if os.path.exists("logo_miguel.png"):
     img = Image.open("logo_miguel.png")
     st.image(img, use_column_width=True)
 
-st.title("🏹 Scanner de Dividendos e Inversión")
+st.title("🏹 Terminal de Inversión Inteligente - Miguel")
 
-# --- 2. EL RADAR DE DIVIDENDOS Y TENDENCIA ---
+# --- 2. EL SUPER ESCÁNER (RSI + DIVIDENDOS + BACKTESTING) ---
 tickers = ["SAN.MC", "BBVA.MC", "TEF.MC", "IBE.MC", "ITX.MC", "REP.MC", "CABK.MC", "SAB.MC", "ENG.MC", "ELE.MC"]
 
-if st.button('🚀 ESCANEAR RENTABILIDAD POR DIVIDENDO', use_container_width=True):
-    st.subheader("📊 Análisis de Rentas y Tendencia")
+if st.button('🚀 EJECUTAR ANÁLISIS COMPLETO DEL IBEX', use_container_width=True):
     col1, col2 = st.columns(2)
-    
-    with st.spinner('Calculando dividendos y salud financiera...'):
+    with st.spinner('Analizando datos en tiempo real...'):
         for t in tickers:
             try:
-                # Descargamos info y datos históricos
-                ticker_obj = yf.Ticker(t)
-                info = ticker_obj.info
-                df = ticker_obj.history(period="3mo")
-                
+                t_obj = yf.Ticker(t)
+                df = t_obj.history(period="4mo")
                 if not df.empty:
+                    # Datos Actuales
                     actual = float(df['Close'].iloc[-1])
-                    # Sacamos el dividendo (Yield)
-                    div_yield = info.get('dividendYield', 0)
-                    div_porcentaje = div_yield * 100 if div_yield else 0
-                    
-                    # Backtesting rápido (30 días)
-                    precio_mes = float(df['Close'].iloc[-21]) if len(df) > 21 else actual
+                    precio_mes = float(df['Close'].iloc[-21])
                     rent_mes = ((actual / precio_mes) - 1) * 100
                     
-                    # Colores: Verde si paga > 4% de dividendo (buena renta)
-                    color_div = "#f0fdf4" if div_porcentaje > 4 else "#f8fafc"
-                    estrella = "⭐" if div_porcentaje > 5 else ""
+                    # Dividendo
+                    div_yield = t_obj.info.get('dividendYield', 0)
+                    div_p = div_yield * 100 if div_yield else 0
                     
+                    # Cálculo RSI (Riesgo)
+                    delta = df['Close'].diff()
+                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                    rs = gain / loss
+                    rsi_val = 100 - (100 / (1 + rs.iloc[-1]))
+                    
+                    # Semáforo de Riesgo
+                    if rsi_val > 70: msg_rsi = "🔴 SOBRECOMPRA"
+                    elif rsi_val < 30: msg_rsi = "🟢 SOBREVENTA"
+                    else: msg_rsi = "⚖️ NEUTRO"
+                    
+                    # Columna y Diseño
                     target = col1 if rent_mes > 0 else col2
+                    clase = "compra" if rent_mes > 0 else "venta"
                     
                     with target:
                         st.markdown(f"""
-                            <div style="background-color:{color_div}; padding:15px; border-radius:10px; border:1px solid #ddd; margin-bottom:10px;">
-                                <h4 style="margin:0;">{t}: {actual:.2f}€ {estrella}</h4>
-                                <p style="margin:5px 0; color:#166534; font-weight:bold;">💰 Dividendo Anual: {div_porcentaje:.2f}%</p>
-                                <p style="margin:0; font-size:14px;">Evolución mes: {rent_mes:.2f}%</p>
+                            <div class="card {clase}">
+                                <span class="badge">RSI: {rsi_val:.1f} ({msg_rsi})</span>
+                                <h3 style="margin:5px 0;">{t}: {actual:.2f}€</h3>
+                                <p style="margin:0;"><b>💰 Dividendo: {div_p:.2f}%</b></p>
+                                <p style="margin:0; font-size:14px;">Hace 30 días: {precio_mes:.2f}€ ({rent_mes:.2f}%)</p>
                             </div>
                         """, unsafe_allow_html=True)
             except: continue
 
 st.divider()
 
-# --- 3. SIMULADOR DE "PAGA EXTRA" ---
-st.subheader("💵 Simulador de Paga Extra (Dividendos)")
+# --- 3. SIMULADOR DE BENEFICIOS Y PAGA EXTRA ---
+st.subheader("💰 Calculadora de Ganancias Futuras")
 c1, c2 = st.columns([1, 1.5])
 
 with c1:
-    inv_div = st.number_input("Dinero para invertir (€):", min_value=500, value=5000, step=500)
-    accion_div = st.selectbox("Elegir para dividendos:", tickers)
+    inversion = st.number_input("Dinero a invertir (€):", min_value=100, value=1000, step=100)
+    accion_e = st.selectbox("Elegir acción:", tickers)
+    objetivo = st.slider("Objetivo de subida (%)", 1, 30, 5)
 
 with c2:
     try:
-        t_obj = yf.Ticker(accion_div)
-        y_div = t_obj.info.get('dividendYield', 0)
-        p_div = float(t_obj.history(period="1d")['Close'].iloc[-1])
+        t_sim = yf.Ticker(accion_e)
+        p_v = float(t_sim.history(period="1d")['Close'].iloc[-1])
+        y_v = t_sim.info.get('dividendYield', 0)
         
-        cobro_anual = inv_div * y_div
-        cobro_mensual = cobro_anual / 12
+        num_acciones = int(inversion / p_v)
+        ganancia_subida = (p_v * (objetivo/100)) * num_acciones
+        paga_extra_anual = inversion * y_v
         
         st.markdown(f"""
-            <div style="background-color:#fff7ed; padding:20px; border-radius:15px; border:2px solid #ea580c;">
-                <h3 style="color:#ea580c; margin-top:0;">Tu Renta Pasiva con {accion_div}:</h3>
-                <p style="font-size:24px; color:#c2410c; margin:10px 0;"><b>Cobrarías {cobro_anual:.2f}€ al año</b></p>
-                <p style="font-size:18px;">Equivale a una "paga" de <b>{cobro_mensual:.2f}€ al mes</b> sin trabajar.</p>
-                <hr style="border-top: 1px solid #ea580c;">
-                <small>Basado en un dividendo del {(y_div*100):.2f}%</small>
+            <div style="background-color:#f0f9ff; padding:20px; border-radius:15px; border:2px solid #0369a1;">
+                <h3 style="color:#0369a1; margin-top:0;">Proyección para {accion_e}:</h3>
+                <p style="font-size:24px; color:#166534; margin:10px 0;"><b>¡Ganarías {ganancia_subida:.2f}€ por la subida!</b></p>
+                <p style="font-size:18px; color:#c2410c;">Y cobrarías <b>{paga_extra_anual:.2f}€ al año</b> de dividendos.</p>
+                <p>Comprando {num_acciones} acciones a {p_v:.2f}€.</p>
             </div>
         """, unsafe_allow_html=True)
-    except: st.write("Calculando renta...")
+    except: st.write("Calculando...")
