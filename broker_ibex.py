@@ -5,7 +5,7 @@ import numpy as np
 from PIL import Image
 import os
 
-st.set_page_config(page_title="Miguel - Backtesting Pro", layout="wide")
+st.set_page_config(page_title="Miguel - Radar de Dividendos", layout="wide")
 
 # Estilo blanco limpio
 st.markdown("<style>.stApp { background-color: #ffffff; }</style>", unsafe_allow_html=True)
@@ -15,76 +15,75 @@ if os.path.exists("logo_miguel.png"):
     img = Image.open("logo_miguel.png")
     st.image(img, use_column_width=True)
 
-st.title("🏹 Scanner & Prueba de Estrategia (Backtesting)")
+st.title("🏹 Scanner de Dividendos e Inversión")
 
-# --- 2. ESCÁNER CON BACKTESTING DE 30 DÍAS ---
-tickers = ["SAN.MC", "BBVA.MC", "TEF.MC", "IBE.MC", "ITX.MC", "REP.MC", "CABK.MC", "SAB.MC", "GRF.MC"]
+# --- 2. EL RADAR DE DIVIDENDOS Y TENDENCIA ---
+tickers = ["SAN.MC", "BBVA.MC", "TEF.MC", "IBE.MC", "ITX.MC", "REP.MC", "CABK.MC", "SAB.MC", "ENG.MC", "ELE.MC"]
 
-if st.button('🚀 ESCANEAR Y PROBAR ESTRATEGIA', use_container_width=True):
-    st.subheader("📊 Resultados de los últimos 30 días")
+if st.button('🚀 ESCANEAR RENTABILIDAD POR DIVIDENDO', use_container_width=True):
+    st.subheader("📊 Análisis de Rentas y Tendencia")
     col1, col2 = st.columns(2)
     
-    with st.spinner('Viajando al pasado para calcular rentabilidad...'):
+    with st.spinner('Calculando dividendos y salud financiera...'):
         for t in tickers:
             try:
-                # Descargamos datos de 4 meses para tener perspectiva
-                df = yf.download(t, period="4mo", progress=False)
+                # Descargamos info y datos históricos
+                ticker_obj = yf.Ticker(t)
+                info = ticker_obj.info
+                df = ticker_obj.history(period="3mo")
+                
                 if not df.empty:
-                    cierre = df['Close'].iloc[:, 0] if len(df['Close'].shape) > 1 else df['Close']
+                    actual = float(df['Close'].iloc[-1])
+                    # Sacamos el dividendo (Yield)
+                    div_yield = info.get('dividendYield', 0)
+                    div_porcentaje = div_yield * 100 if div_yield else 0
                     
-                    # Datos HOY
-                    precio_hoy = float(cierre.iloc[-1])
+                    # Backtesting rápido (30 días)
+                    precio_mes = float(df['Close'].iloc[-21]) if len(df) > 21 else actual
+                    rent_mes = ((actual / precio_mes) - 1) * 100
                     
-                    # Datos HACE 30 DÍAS (Aproximadamente 20 sesiones de bolsa)
-                    precio_hace_mes = float(cierre.iloc[-21])
-                    rentabilidad_mes = ((precio_hoy / precio_hace_mes) - 1) * 100
+                    # Colores: Verde si paga > 4% de dividendo (buena renta)
+                    color_div = "#f0fdf4" if div_porcentaje > 4 else "#f8fafc"
+                    estrella = "⭐" if div_porcentaje > 5 else ""
                     
-                    # Cálculo RSI actual para el semáforo
-                    delta = cierre.diff()
-                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                    rs = gain / loss
-                    rsi_val = 100 - (100 / (1 + rs.iloc[-1]))
+                    target = col1 if rent_mes > 0 else col2
                     
-                    # Color según si habríamos ganado dinero
-                    color_backtest = "#dcfce7" if rentabilidad_mes > 0 else "#fee2e2"
-                    emoji = "📈" if rentabilidad_mes > 0 else "📉"
-                    
-                    with (col1 if rentabilidad_mes > 0 else col2):
+                    with target:
                         st.markdown(f"""
-                            <div style="background-color:{color_backtest}; padding:15px; border-radius:10px; border:1px solid #ddd; margin-bottom:10px;">
-                                <h4 style="margin:0;">{t}: {precio_hoy:.2f}€</h4>
-                                <p style="margin:5px 0;">Hace 30 días: {precio_hace_mes:.2f}€</p>
-                                <strong style="font-size:18px;">{emoji} Rentabilidad: {rentabilidad_mes:.2f}%</strong><br>
-                                <small>Estado actual RSI: {rsi_val:.1f}</small>
+                            <div style="background-color:{color_div}; padding:15px; border-radius:10px; border:1px solid #ddd; margin-bottom:10px;">
+                                <h4 style="margin:0;">{t}: {actual:.2f}€ {estrella}</h4>
+                                <p style="margin:5px 0; color:#166534; font-weight:bold;">💰 Dividendo Anual: {div_porcentaje:.2f}%</p>
+                                <p style="margin:0; font-size:14px;">Evolución mes: {rent_mes:.2f}%</p>
                             </div>
                         """, unsafe_allow_html=True)
             except: continue
 
 st.divider()
 
-# --- 3. SIMULADOR DE GANANCIAS ---
-st.subheader("💰 Calculadora de Beneficios Futuros")
+# --- 3. SIMULADOR DE "PAGA EXTRA" ---
+st.subheader("💵 Simulador de Paga Extra (Dividendos)")
 c1, c2 = st.columns([1, 1.5])
 
 with c1:
-    inversion = st.number_input("Dinero a invertir (€):", min_value=100, value=1000, step=100)
-    accion_elegida = st.selectbox("Valor elegido:", tickers)
-    objetivo = st.slider("Objetivo de subida (%)", 1, 30, 5)
+    inv_div = st.number_input("Dinero para invertir (€):", min_value=500, value=5000, step=500)
+    accion_div = st.selectbox("Elegir para dividendos:", tickers)
 
 with c2:
     try:
-        data_s = yf.download(accion_elegida, period="1d", progress=False)
-        precio_v = float(data_s['Close'].iloc[-1])
-        num_acciones = int(inversion / precio_v)
-        total_invertido = num_acciones * precio_v
-        ganancia_bruta = (precio_v * (objetivo/100)) * num_acciones
+        t_obj = yf.Ticker(accion_div)
+        y_div = t_obj.info.get('dividendYield', 0)
+        p_div = float(t_obj.history(period="1d")['Close'].iloc[-1])
+        
+        cobro_anual = inv_div * y_div
+        cobro_mensual = cobro_anual / 12
         
         st.markdown(f"""
-            <div style="background-color:#f0f9ff; padding:20px; border-radius:15px; border:2px solid #0369a1;">
-                <h3 style="color:#0369a1; margin-top:0;">Proyección para {accion_elegida}:</h3>
-                <p style="font-size:28px; color:#166534; margin:10px 0;"><b>¡Ganarías {ganancia_bruta:.2f}€!</b></p>
-                <p>Comprando {num_acciones} acciones.</p>
+            <div style="background-color:#fff7ed; padding:20px; border-radius:15px; border:2px solid #ea580c;">
+                <h3 style="color:#ea580c; margin-top:0;">Tu Renta Pasiva con {accion_div}:</h3>
+                <p style="font-size:24px; color:#c2410c; margin:10px 0;"><b>Cobrarías {cobro_anual:.2f}€ al año</b></p>
+                <p style="font-size:18px;">Equivale a una "paga" de <b>{cobro_mensual:.2f}€ al mes</b> sin trabajar.</p>
+                <hr style="border-top: 1px solid #ea580c;">
+                <small>Basado en un dividendo del {(y_div*100):.2f}%</small>
             </div>
         """, unsafe_allow_html=True)
-    except: st.write("Seleccionando datos...")
+    except: st.write("Calculando renta...")
