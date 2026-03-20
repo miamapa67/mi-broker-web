@@ -31,7 +31,7 @@ if ticker:
                 
             with col2:
                 # Dibujamos la gráfica
-                st.line_chart(precios)
+                st.area_chart(precios)
         else:
             st.warning(f"No se han encontrado datos para {ticker}. Revisa el nombre.")
             
