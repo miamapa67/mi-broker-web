@@ -1,79 +1,34 @@
+import streamlit as st
 import yfinance as yf
 import pandas as pd
-import streamlit as st
 
-# Configuramos la página web
-st.set_page_config(page_title="Mi Broker Global", page_icon="🌍", layout="centered")
+# Configuración de la página
+st.set_page_config(page_title="Mi Analista Robot", layout="wide")
 
-st.title("🌍 Mi Analista Robot - IBEX & Wall Street")
-st.write("Analizando los mercados de España y Estados Unidos en tiempo real...")
+st.title("🤖 Mi Analista Robot - IBEX & Wall Street")
+st.write("Analizando los mercados en tiempo real...")
 
-# ¡AQUÍ ESTÁ LA MAGIA! Hemos ampliado tu cartera de activos
-empresas_mercado = {
-    # Gigantes del IBEX 35 (España)
-    'Inditex': 'ITX.MC',
-    'Banco Santander': 'SAN.MC',
-    'Iberdrola': 'IBE.MC',
-    'BBVA': 'BBVA.MC',
-    'Telefónica': 'TEF.MC',
-    'Repsol': 'REP.MC',
-    'CaixaBank': 'CABK.MC',
-    'Aena': 'AENA.MC',
+# Lista de acciones
+tickers = ["SAN.MC", "TEF.MC", "ITX.MC", "BBVA.MC", "AAPL", "MSFT", "TSLA"]
+
+try:
+    # Descargamos datos
+    with st.spinner('Consultando a la bolsa...'):
+        data = yf.download(tickers, period="1d")['Close']
     
-    # Gigantes de Wall Street (EEUU)
-    'Apple': 'AAPL',
-    'Microsoft': 'MSFT',
-    'Nvidia': 'NVDA',
-    'Tesla': 'TSLA',
-    'Amazon': 'AMZN'
-}
-
-resultados = []
-historicos = {} 
-
-# Ponemos un "cargador" visual mientras descarga los datos
-with st.spinner('Descargando datos globales (esto puede tardar unos segundos más)...'):
-    for nombre, ticker in empresas_mercado.items():
-        accion = yf.Ticker(ticker)
-        historial = accion.history(period="6mo")
+    if not data.empty:
+        st.subheader("📊 Resumen de Precios")
+        # Mostramos una tabla bonita
+        df_precios = data.tail(1).T
+        df_precios.columns = ['Precio Actual']
+        st.dataframe(df_precios, use_container_width=True)
         
-        if not historial.empty:
-            historicos[nombre] = historial 
-            
-            precio_actual = historial['Close'].iloc[-1]
-            sma_20 = historial['Close'].rolling(window=20).mean().iloc[-1]
-            sma_50 = historial['Close'].rolling(window=50).mean().iloc[-1]
-            
-            if precio_actual > sma_20 and sma_20 > sma_50:
-                tendencia = "🟢 Alcista Fuerte"
-                recomendacion = "COMPRAR"
-            elif precio_actual < sma_20 and sma_20 < sma_50:
-                tendencia = "🔴 Bajista Fuerte"
-                recomendacion = "VENDER"
-            else:
-                tendencia = "🟡 Lateral"
-                recomendacion = "ESPERAR"
-                
-            resultados.append({
-                'Empresa': nombre,
-                'Precio ($/€)': round(precio_actual, 2),
-                'SMA 20': round(sma_20, 2),
-                'SMA 50': round(sma_50, 2),
-                'Tendencia': tendencia,
-                'Recomendación': recomendacion
-            })
+        st.success("Datos actualizados correctamente.")
+    else:
+        st.error("No se han recibido datos. Prueba a recargar la página.")
 
-# Mostramos la tabla principal
-if resultados:
-    st.subheader("📊 Resumen de Mercados")
-    tabla_resultados = pd.DataFrame(resultados)
-    st.dataframe(tabla_resultados, use_container_width=True)
-    
-    # SECCIÓN DE GRÁFICOS
-    st.divider() 
-    st.subheader("📉 Gráfico de Cotización (Últimos 6 meses)")
-    
-    empresa_seleccionada = st.selectbox("Selecciona una empresa para analizar su gráfico:", list(empresas_mercado.keys()))
-    
-    datos_grafico = historicos[empresa_seleccionada][['Close']]
-    st.line_chart(datos_grafico)
+except Exception as e:
+    st.error(f"Error técnico: {e}")
+
+st.write("---")
+st.caption("Datos proporcionados por Yahoo Finance • 2026")
