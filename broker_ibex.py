@@ -2,38 +2,27 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 
-# Configuración básica
 st.set_page_config(page_title="Analista Robot Pro", layout="wide")
-
 st.title("🤖 Analista Robot Pro")
-st.write("Conexión establecida con éxito.")
 
-# Buscador mejorado
-ticker = st.text_input("Introduce un Ticker (ej: SAN.MC, AAPL, TSLA):", value="SAN.MC").upper().strip()
+ticker = st.text_input("Introduce un Ticker (ej: SAN.MC):", value="SAN.MC").upper().strip()
 
 if ticker:
     try:
-        # Descargamos los datos
-        data = yf.download(ticker, period="6mo")['Close']
+        # Usamos Ticker() en lugar de download() directo, es más estable
+        t = yf.Ticker(ticker)
+        data = t.history(period="6mo")
         
         if not data.empty:
-            # Limpiamos los datos por si vienen duplicados
-            precios = data.dropna()
-            # Cogemos el último precio de forma segura
-            ultimo_precio = float(precios.iloc[-1])
-            
+            ultimo_precio = float(data['Close'].iloc[-1])
             col1, col2 = st.columns([1, 3])
-            
             with col1:
-                # Mostramos el precio con formato simple
-                st.metric(label=f"Precio {ticker}", value=f"{ultimo_precio:.2f}")
-                st.write("✅ Datos actualizados")
-                
+                st.metric(label=f"Precio {ticker}", value=f"{ultimo_precio:.2f}€")
+                st.success("Conexión privada establecida")
             with col2:
-                # Dibujamos la gráfica
-                st.area_chart(precios)
+                # Dibujamos con área para que se vea mejor
+                st.area_chart(data['Close'])
         else:
-            st.warning(f"No se han encontrado datos para {ticker}. Revisa el nombre.")
-            
+            st.warning("Yahoo está tardando en soltar los datos. Espera 30 segundos y pulsa Intro.")
     except Exception as e:
-        st.error("Yahoo Finance está tardando en responder. Pulsa Intro de nuevo.")
+        st.error("Límite de peticiones alcanzado. Descansando 1 minuto...")
