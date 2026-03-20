@@ -4,7 +4,7 @@ import pandas as pd
 from PIL import Image
 import os
 
-st.set_page_config(page_title="Miguel Financial Terminal", layout="wide")
+st.set_page_config(page_title="Miguel Terminal Pro", layout="wide")
 
 # Estilo Blanco Nítido
 st.markdown("<style>.stApp { background-color: #ffffff; }</style>", unsafe_allow_html=True)
@@ -15,23 +15,23 @@ if os.path.exists("logo_miguel.png"):
     st.image(img, use_column_width=True)
 
 st.title("🏹 Terminal Financiera - MIGUEL")
-st.write("Escáner de Oportunidades + Radar de Noticias en Tiempo Real.")
+st.write("Precio en tiempo real + RSI + Noticias de última hora.")
 
-# --- 2. MOTOR DE ANÁLISIS Y NOTICIAS ---
+# --- 2. MOTOR DE ANÁLISIS ---
 tickers = ["SAN.MC", "BBVA.MC", "TEF.MC", "IBE.MC", "ITX.MC", "REP.MC", "CABK.MC", "SAB.MC", "GRF.MC"]
 
-if st.button('🚀 EJECUTAR ESCÁNER DE MERCADO Y NOTICIAS', use_container_width=True):
-    st.subheader("📊 Análisis de Activos")
+if st.button('🚀 EJECUTAR ANÁLISIS COMPLETO', use_container_width=True):
+    st.subheader("📊 Cotizaciones y Noticias")
     
-    with st.spinner('Rastreando prensa financiera y cotizaciones...'):
+    with st.spinner('Actualizando precios de Madrid...'):
         for t in tickers:
             try:
                 tk = yf.Ticker(t)
-                # Datos de precio (últimos 3 meses para RSI)
                 hist = tk.history(period="3mo")
                 if hist.empty: continue
                 
-                actual = float(hist['Close'].iloc[-1])
+                # PRECIO ACTUAL (Lo hacemos bien visible)
+                precio_actual = float(hist['Close'].iloc[-1])
                 
                 # Cálculo de RSI
                 delta = hist['Close'].diff()
@@ -40,53 +40,44 @@ if st.button('🚀 EJECUTAR ESCÁNER DE MERCADO Y NOTICIAS', use_container_width
                 rs = gain / loss
                 rsi_val = 100 - (100 / (1 + rs.iloc[-1]))
                 
-                # Noticias (sacamos las 2 más recientes)
-                news = tk.news[:2]
+                # Color y Estado
+                if rsi_val > 70: estado = "🔴 SOBRECOMPRA"
+                elif rsi_val < 30: estado = "🟢 OPORTUNIDAD"
+                else: estado = "⚪ NEUTRO"
                 
-                # Color según RSI
-                if rsi_val > 70: col_bg, estado = "#fef2f2", "⚠️ SOBRECOMPRA"
-                elif rsi_val < 30: col_bg, estado = "#f0fdf4", "✅ OPORTUNIDAD"
-                else: col_bg, estado = "#f8fafc", "⚖️ NEUTRO"
-                
-                # Tarjeta de la Empresa
-                with st.expander(f"PROYECCIÓN: {t} - {actual:.2f}€ ({estado})", expanded=True):
-                    c1, c2 = st.columns([1, 2])
-                    with c1:
+                # LA TARJETA CON EL PRECIO BIEN GRANDE EN EL TÍTULO
+                with st.expander(f"📈 {t}: {precio_actual:.2f}€ | {estado}", expanded=True):
+                    col1, col2 = st.columns([1, 2])
+                    
+                    with col1:
+                        st.metric(label="Precio Actual", value=f"{precio_actual:.2f}€")
                         st.write(f"**RSI:** {rsi_val:.1f}")
                         div = tk.info.get('dividendYield', 0)
                         if div: st.write(f"💰 **Div:** {div*100:.2f}%")
                     
-                    with c2:
-                        st.write("**📰 Última hora:**")
+                    with col2:
+                        st.write("**📰 Noticias recientes:**")
+                        news = tk.news[:2]
                         if news:
                             for n in news:
                                 st.markdown(f"• [{n['title']}]({n['link']})")
                         else:
-                            st.write("Sin noticias recientes destacadas.")
+                            st.write("No hay noticias hoy.")
                             
-            except Exception as e:
-                continue
+            except: continue
 
 st.divider()
 
-# --- 3. CALCULADORA DE BENEFICIOS (OPTIMIZADA) ---
-st.subheader("💰 Simulador de Ganancia Neta")
-col_sim1, col_sim2 = st.columns(2)
-
-with col_sim1:
-    inver = st.number_input("Capital a invertir (€):", value=1000, step=500)
-    acc_sim = st.selectbox("Valor para simular:", tickers)
-    objetivo = st.slider("Subida esperada (%)", 1, 25, 5)
-
-with col_sim2:
+# --- 3. CALCULADORA (SE MANTIENE) ---
+st.subheader("💰 Simulador de Beneficios")
+c1, c2 = st.columns(2)
+with c1:
+    inver = st.number_input("Dinero (€):", value=1000)
+    acc = st.selectbox("Acción:", tickers)
+    sub = st.slider("Subida (%)", 1, 25, 5)
+with c2:
     try:
-        t_sim = yf.Ticker(acc_sim)
-        p_act = float(t_sim.history(period="1d")['Close'].iloc[-1])
-        n_acc = int(inver / p_act)
-        beneficio = (p_act * (objetivo/100)) * n_acc
-        
-        st.success(f"**Resultado para {acc_sim}:**")
-        st.write(f"Comprarías **{n_acc}** acciones.")
-        st.write(f"Beneficio estimado: **+{beneficio:.2f}€**")
-    except:
-        st.info("Esperando selección...")
+        p_v = float(yf.Ticker(acc).history(period="1d")['Close'].iloc[-1])
+        n = int(inver / p_v)
+        st.success(f"**Beneficio esperado: +{(p_v * (sub/100)) * n:.2f}€**")
+    except: st.info("Cargando...")
