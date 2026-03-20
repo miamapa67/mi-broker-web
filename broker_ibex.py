@@ -1,6 +1,6 @@
 import streamlit as st
 import yfinance as yf
-import pandas as pd
+import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="Analista Robot Pro", layout="wide")
 
@@ -10,8 +10,6 @@ st.title("🤖 Analista Robot Pro")
 with st.sidebar:
     st.header("⚙️ Configuración")
     modo = st.radio("Selecciona modo:", ["Monitor General", "Buscador Individual", "Duelo de Acciones"])
-    st.write("---")
-    st.caption("Datos reales de Yahoo Finance")
 
 # --- MODO 2: BUSCADOR INDIVIDUAL ---
 if modo == "Buscador Individual":
@@ -24,55 +22,51 @@ if modo == "Buscador Individual":
             hist = ticker_obj.history(period="6mo")
             
             if not hist.empty:
-                # Limpiamos los datos para que no den error visual
-                df_plot = hist[['Close']].copy()
-                actual = float(df_plot['Close'].iloc[-1])
-                media_20 = float(df_plot['Close'].tail(20).mean())
+                actual = float(hist['Close'].iloc[-1])
+                media_20 = float(hist['Close'].tail(20).mean())
                 
-                c1, c2 = st.columns([1, 3])
+                c1, c2 = st.columns([1, 2])
                 with c1:
                     st.metric("Precio Actual", f"{actual:.2f}")
                     diff = ((actual/media_20)-1)*100
                     st.write(f"Vs Media 20d: {diff:.2f}%")
-                    
                     status = "COMPRA ✅" if actual > media_20 else "VENTA ❌"
                     color = "green" if actual > media_20 else "red"
-                    st.markdown(f"### **<span style='color:{color}'>{status}</span>**", unsafe_allow_html=True)
+                    st.markdown(f"### <span style='color:{color}'>{status}</span>", unsafe_allow_html=True)
                 
                 with c2:
-                    # Cambiamos st.line_chart por st.area_chart que suele ser más estable
-                    st.area_chart(df_plot)
+                    # Creamos una gráfica "clásica" que no da errores de frontend
+                    fig, ax = plt.subplots(figsize=(8, 4))
+                    ax.plot(hist.index, hist['Close'], color='#1f77b4')
+                    ax.set_title(f"Evolución 6 meses: {t}")
+                    plt.xticks(rotation=45)
+                    st.pyplot(fig) # Esto envía una IMAGEN, evitando el error LargeUtf8
             else:
-                st.warning("No hay datos para este símbolo.")
+                st.warning("No hay datos.")
         except:
-            st.error("Error de conexión con Yahoo Finance.")
+            st.error("Error al conectar con los datos.")
 
 # --- MODO 1: MONITOR GENERAL ---
 elif modo == "Monitor General":
-    st.subheader("🇪🇸 Semáforo del IBEX 35")
-    ibex_35 = ["ANA.MC", "ACS.MC", "ACG.MC", "AENA.MC", "AMS.MC", "MTS.MC", "SAB.MC", "SAN.MC", "BKT.MC", "BBVA.MC", "CABK.MC", "CLNX.MC", "ENG.MC", "ELE.MC", "FER.MC", "FDR.MC", "GRF.MC", "IAG.MC", "IBE.MC", "ITX.MC", "IDR.MC", "COL.MC", "LOG.MC", "MAP.MC", "MEL.MC", "MRL.MC", "NTGY.MC", "PUIG.MC", "REE.MC", "REP.MC", "ROVI.MC", "SCYR.MC", "SLR.MC", "TEF.MC", "UNI.MC"]
-    try:
-        data_ibex = yf.download(ibex_35, period="1mo")['Close']
-        cols = st.columns(5)
-        for i, ticker in enumerate(ibex_35):
-            with cols[i % 5]:
-                serie = data_ibex[ticker].dropna()
-                if not serie.empty:
-                    act = float(serie.iloc[-1]); med = float(serie.tail(20).mean())
-                    color = "green" if act > med else "red"
-                    st.markdown(f"**{ticker.replace('.MC','')}**")
-                    st.markdown(f"<span style='color:{color}; font-weight:bold;'>{'COMPRA' if act > med else 'VENTA'}</span>", unsafe_allow_html=True)
-                    st.metric(label="Precio", value=f"{act:.2f}€", delta=f"{((act/med)-1)*100:.1f}%")
-    except: st.write("Cargando...")
+    st.subheader("🇪🇸 Resumen IBEX 35")
+    # Versión simplificada para evitar errores
+    ibex_35 = ["SAN.MC", "BBVA.MC", "TEF.MC", "ITX.MC", "REP.MC", "IBE.MC", "IAG.MC"]
+    data = yf.download(ibex_35, period="1mo")['Close']
+    cols = st.columns(len(ibex_35))
+    for i, ticker in enumerate(ibex_35):
+        with cols[i]:
+            val = data[ticker].iloc[-1]
+            st.metric(ticker.replace(".MC",""), f"{val:.2f}€")
 
 # --- MODO 3: DUELO ---
 elif modo == "Duelo de Acciones":
-    st.subheader("⚔️ Duelo de Rentabilidad")
+    st.subheader("⚔️ Duelo")
     t1 = st.text_input("Acción 1:", "SAN.MC").upper()
     t2 = st.text_input("Acción 2:", "BBVA.MC").upper()
     if t1 and t2:
         df = yf.download([t1, t2], period="6mo")['Close']
-        if not df.empty:
-            st.area_chart((df / df.iloc[0]) * 100)
+        fig, ax = plt.subplots()
+        ax.plot((df / df.iloc[0]) * 100)
+        st.pyplot(fig)
    
    
