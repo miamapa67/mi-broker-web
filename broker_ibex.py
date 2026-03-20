@@ -3,15 +3,14 @@ import yfinance as yf
 import pandas as pd
 
 # Configuración de página
-st.set_page_config(page_title="IBEX 35 - Scanner de Volumen", layout="wide")
+st.set_page_config(page_title="Scanner IBEX - Dividendos Pro", layout="wide")
 
-# --- DISEÑO MODO CLARO PRO ---
+# --- DISEÑO MODO CLARO ---
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
     h1, h2, h3 { color: #1e293b !important; }
     
-    /* Tarjetas con indicador de volumen */
     .card-compra { 
         background-color: #f0fdf4; color: #166534; padding: 20px; 
         border-radius: 12px; border-left: 8px solid #22c55e; margin-bottom: 15px;
@@ -22,70 +21,82 @@ st.markdown("""
         border-radius: 12px; border-left: 8px solid #ef4444; margin-bottom: 15px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     }
-    .vol-badge {
-        background-color: #1e293b; color: white; padding: 4px 8px;
-        border-radius: 6px; font-size: 12px; font-weight: bold;
+    .badge {
+        background-color: #1e293b; color: white; padding: 4px 10px;
+        border-radius: 6px; font-size: 11px; font-weight: bold; margin-right: 5px;
+    }
+    .badge-div {
+        background-color: #2563eb; color: white; padding: 4px 10px;
+        border-radius: 6px; font-size: 11px; font-weight: bold;
     }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏹 Scanner de Volumen e Inversión IBEX 35")
-st.write("Detectando dónde están entrando los 'peces gordos' hoy.")
+st.title("💰 Radar de Dividendos e Inversión")
+st.write("Analizando tendencia, volumen y rentabilidad por dividendo del IBEX 35.")
 
-# Lista ampliada del IBEX
+# Lista de valores clave para dividendos
 ibex_tickers = [
     "SAN.MC", "BBVA.MC", "TEF.MC", "IBE.MC", "ITX.MC", "REP.MC", 
-    "CABK.MC", "SAB.MC", "AMS.MC", "ELE.MC", "FER.MC", "ACS.MC", "GRF.MC"
+    "ENG.MC", "ELE.MC", "NTGY.MC", "ACS.MC", "CABK.MC", "SAB.MC"
 ]
 
-@st.cache_data(ttl=600)
-def escanear_volumen(tickers):
+@st.cache_data(ttl=3600)
+def escanear_completo(tickers):
     compras, ventas = [], []
     for t in tickers:
         try:
-            df = yf.download(t, period="2mo", progress=False)
+            stock = yf.Ticker(t)
+            df = stock.history(period="2mo")
+            info = stock.info
+            
             if not df.empty:
-                # Datos de precio
-                cierre = df['Close'].iloc[:, 0] if isinstance(df['Close'], pd.DataFrame) else df['Close']
-                actual = float(cierre.iloc[-1])
-                media_20 = float(cierre.tail(20).mean())
+                # Precio y Tendencia
+                actual = float(df['Close'].iloc[-1])
+                media_20 = float(df['Close'].tail(20).mean())
                 dif_precio = ((actual / media_20) - 1) * 100
                 
-                # Datos de volumen
+                # Volumen
                 vol_hoy = float(df['Volume'].iloc[-1])
                 vol_medio = float(df['Volume'].tail(20).mean())
                 fuerza_vol = (vol_hoy / vol_medio) * 100
                 
-                info = {"ticker": t, "precio": actual, "dif": dif_precio, "vol": fuerza_vol}
-                if actual > media_20: compras.append(info)
-                else: ventas.append(info)
+                # Dividendo (Convertimos a porcentaje, ej: 0.05 -> 5%)
+                rent_div = info.get('dividendYield', 0)
+                rent_div = (rent_div * 100) if rent_div else 0
+                
+                datos = {"ticker": t, "precio": actual, "dif": dif_precio, "vol": fuerza_vol, "div": rent_div}
+                
+                if actual > media_20: compras.append(datos)
+                else: ventas.append(datos)
         except: continue
-    return sorted(compras, key=lambda x: x['vol'], reverse=True), sorted(ventas, key=lambda x: x['vol'], reverse=True)
+    return sorted(compras, key=lambda x: x['div'], reverse=True), sorted(ventas, key=lambda x: x['div'], reverse=True)
 
-if st.button('🔍 ANALIZAR FUERZA DEL MERCADO'):
-    l_compra, l_venta = escanear_volumen(ibex_tickers)
+if st.button('🚀 ESCANEAR RENTABILIDAD AHORA'):
+    l_compra, l_venta = escanear_completo(ibex_tickers)
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("🎯 COMPRA CON FUERZA")
-        for item in l_compra[:6]:
+        st.subheader("🎯 COMPRA (Alcistas + Dividendos)")
+        for item in l_compra:
             st.markdown(f"""
                 <div class='card-compra'>
-                    <span class='vol-badge'>Volumen: {item['vol']:.0f}%</span>
+                    <span class='badge'>Volumen: {item['vol']:.0f}%</span>
+                    <span class='badge-div'>Dividendo: {item['div']:.2f}%</span>
                     <h3 style='margin:10px 0 5px 0;'>{item['ticker']} - {item['precio']:.2f}€</h3>
-                    <strong> Tendencia: +{item['dif']:.2f}%</strong> (Alcista)
+                    <strong>Tendencia: +{item['dif']:.2f}%</strong>
                 </div>
                 """, unsafe_allow_html=True)
                 
     with col2:
-        st.subheader("🚨 VENTA / DEBILIDAD")
-        for item in l_venta[:6]:
+        st.subheader("🚨 VENTA (Bajistas / Riesgo)")
+        for item in l_venta:
             st.markdown(f"""
                 <div class='card-venta'>
-                    <span class='vol-badge'>Volumen: {item['vol']:.0f}%</span>
+                    <span class='badge'>Volumen: {item['vol']:.0f}%</span>
+                    <span class='badge-div'>Dividendo: {item['div']:.2f}%</span>
                     <h3 style='margin:10px 0 5px 0;'>{item['ticker']} - {item['precio']:.2f}€</h3>
-                    <strong> Tendencia: {item['dif']:.2f}%</strong> (Bajista)
+                    <strong>Tendencia: {item['dif']:.2f}%</strong>
                 </div>
                 """, unsafe_allow_html=True)
-   
