@@ -18,10 +18,13 @@ try:
     
     if not data.empty:
         st.subheader("📊 Resumen de Precios")
-        # Mostramos una tabla bonita
-        df_precios = data.tail(1).T
-        df_precios.columns = ['Precio Actual']
-        st.dataframe(df_precios, use_container_width=True)
+
+    
+    
+       # Formato ultra-compatible (evita el error de antes)
+        st.write("### Lista de Cotizaciones")
+        for ticker, precio in data.tail(1).T.iloc[:, 0].items():
+            st.metric(label=ticker, value=f"{precio:.2f}") 
         
         st.success("Datos actualizados correctamente.")
     else:
