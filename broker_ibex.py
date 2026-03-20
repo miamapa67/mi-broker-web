@@ -4,10 +4,10 @@ import pandas as pd
 
 st.set_page_config(page_title="Monitor IBEX 35", layout="wide")
 
-st.title("🇪🇸 Monitor en Tiempo Real: Los 35 del IBEX")
-st.write("Analizando tendencia y recomendación para todo el selectivo español.")
+st.title("🇪🇸 Semáforo IBEX 35: Estrategia de Medias")
+st.write("Verde = Tendencia Alcista (Compra) | Rojo = Tendencia Bajista (Venta)")
 
-# Lista oficial de los 35 tickers de Yahoo Finance para el IBEX
+# Lista oficial de los 35 componentes
 ibex_35 = [
     "ANA.MC", "ACS.MC", "ACG.MC", "AENA.MC", "AMS.MC", "MTS.MC", "SAB.MC", "SAN.MC", 
     "BKT.MC", "BBVA.MC", "CABK.MC", "CLNX.MC", "ENG.MC", "ELE.MC", "FER.MC", "FDR.MC", 
@@ -17,45 +17,45 @@ ibex_35 = [
 ]
 
 try:
-    # Descargamos datos de 40 días para la media móvil
-    with st.spinner('Conectando con la Bolsa de Madrid...'):
+    with st.spinner('Actualizando precios de Madrid...'):
+        # Descargamos 40 días para asegurar que la media de 20 sea sólida
         data = yf.download(ibex_35, period="40d")['Close']
     
     if not data.empty:
-        # Layout en columnas (5 por fila en PC)
+        # Mostramos 5 columnas en PC, se adaptará a 1 o 2 en el móvil
         cols = st.columns(5)
         
-        # Diccionario para nombres más legibles (opcional, aquí usamos el Ticker)
         for i, ticker in enumerate(ibex_35):
             with cols[i % 5]:
-                # Obtener último precio disponible (que no sea NaN)
-                serie_precios = data[ticker].dropna()
-                if not serie_precios.empty:
-                    precio_actual = serie_precios.iloc[-1]
-                    media_20 = serie_precios.tail(20).mean()
+                serie = data[ticker].dropna()
+                if not serie.empty:
+                    actual = serie.iloc[-1]
+                    media = serie.tail(20).mean()
                     
-                    # Lógica de inversión
-                    subida = precio_actual > media_20
-                    rec = "COMPRA" if subida else "VENTA"
-                    color_flecha = "normal" if subida else "inverse"
-                    pct = ((precio_actual/media_20)-1)*100
+                    # CÁLCULO DE TENDENCIA
+                    es_alcista = actual > media
+                    status = "COMPRA" if es_alcista else "VENTA"
+                    # 'normal' pone el delta en verde, 'inverse' en rojo
+                    color_semaforo = "normal" if es_alcista else "inverse"
+                    
+                    # Calculamos el porcentaje de desviación sobre la media
+                    dif_pct = ((actual / media) - 1) * 100
                     
                     st.metric(
-                        label=f"{ticker.replace('.MC', '')} ({rec})",
-                        value=f"{precio_actual:.3f}€",
-                        delta=f"{pct:.2f}% vs media",
-                        delta_color=color_flecha
+                        label=f"{ticker.replace('.MC', '')} [{status}]",
+                        value=f"{actual:.3f} €",
+                        delta=f"{dif_pct:.2f}% vs media",
+                        delta_color=color_semaforo
                     )
                 else:
                     st.caption(f"{ticker}: Sin datos")
         
         st.divider()
-        st.success("✅ Todos los valores del IBEX 35 analizados correctamente.")
+        st.info("💡 Consejo: Las acciones en verde están 'fuertes' técnicamente.")
     else:
-        st.error("No se pudo conectar con los datos del IBEX.")
+        st.error("No se han podido cargar los datos de Yahoo Finance.")
 
 except Exception as e:
-    st.error(f"Error técnico: {e}")
+    st.error(f"Error en el robot: {e}")
 
-st.caption("Estrategia: Tendencia alcista si Precio > Media Móvil 20 sesiones.")
-        
+st.caption("Filtro: Precio actual comparado con Media Móvil Simple de 20 sesiones.")
