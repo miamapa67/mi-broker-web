@@ -32,41 +32,50 @@ if modo == "Monitor General":
             with cols[i % 5]:
                 serie = data_ibex[ticker].dropna()
                 if not serie.empty:
-                    act = serie.iloc[-1]
-                    med = serie.tail(20).mean()
+                    act = float(serie.iloc[-1]) # Forzamos a número
+                    med = float(serie.tail(20).mean())
                     alc = act > med
                     status = "COMPRA" if alc else "VENTA"
                     color = "green" if alc else "red"
                     st.markdown(f"**{ticker.replace('.MC','')}**")
                     st.markdown(f"<span style='color:{color}; font-weight:bold;'>{status}</span>", unsafe_allow_html=True)
                     st.metric(label="Precio", value=f"{act:.2f}€", delta=f"{((act/med)-1)*100:.1f}%")
-    except: st.error("Error cargando el monitor.")
+    except: st.error("Cargando datos del IBEX...")
 
 # --- MODO 2: BUSCADOR INDIVIDUAL ---
 elif modo == "Buscador Individual":
-    st.subheader("🔎 Análisis Detallado de Activo")
-    t = st.text_input("Introduce Ticker (ej: NVDA, TSLA, SAN.MC):", value="SAN.MC").upper()
+    st.subheader("🔎 Análisis Detallado")
+    t = st.text_input("Ticker (ej: NVDA, TSLA, SAN.MC):", value="SAN.MC").upper().strip()
     if t:
-        d = yf.download(t, period="1y")['Close']
-        if not d.empty:
-            c1, c2 = st.columns([1, 3])
-            with c1:
-                actual = d.iloc[-1]
-                st.metric("Precio Actual", f"{actual:.2f}")
-                st.write(f"Variación anual: {((actual/d.iloc[0])-1)*100:.2f}%")
-            with c2:
-                st.line_chart(d)
+        try:
+            d = yf.download(t, period="1y")['Close']
+            if not d.empty:
+                d = d.dropna()
+                c1, c2 = st.columns([1, 3])
+                with c1:
+                    actual = float(d.iloc[-1]) # Convertimos a float para evitar el TypeError
+                    media_val = float(d.tail(20).mean())
+                    st.metric("Precio Actual", f"{actual:.2f}")
+                    st.write(f"Varia. vs media: {((actual/media_val)-1)*100:.2f}%")
+                with c2:
+                    st.line_chart(d)
+            else: st.warning("No se encontraron datos.")
+        except: st.error("Error al buscar este símbolo.")
 
 # --- MODO 3: DUELO DE ACCIONES ---
 elif modo == "Duelo de Acciones":
     st.subheader("⚔️ Duelo de Rentabilidad")
     col_a, col_b = st.columns(2)
-    with col_a: t1 = st.text_input("Acción 1:", value="SAN.MC").upper()
-    with col_b: t2 = st.text_input("Acción 2:", value="BBVA.MC").upper()
+    with col_a: t1 = st.text_input("Acción 1:", value="SAN.MC").upper().strip()
+    with col_b: t2 = st.text_input("Acción 2:", value="BBVA.MC").upper().strip()
     
     if t1 and t2:
-        df = yf.download([t1, t2], period="6mo")['Close']
-        # Normalizamos a 100 para comparar rentabilidad real
-        df_norm = (df / df.iloc[0]) * 100
-        st.line_chart(df_norm)
-        st.info("Gráfica normalizada: Ambas empiezan en 100 para ver cuál crece más porcentualmente.")
+        try:
+            df = yf.download([t1, t2], period="6mo")['Close']
+            if not df.empty:
+                df_norm = (df / df.iloc[0]) * 100
+                st.line_chart(df_norm)
+                st.info("Gráfica normalizada (Base 100)")
+        except: st.error("Error en el duelo.")
+   
+   
