@@ -1,11 +1,12 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import plotly.express as px # Nueva herramienta para gráficas pro
 
 # Configuración de página
 st.set_page_config(page_title="Radar de Inversión Pro", layout="wide")
 
-# --- ESTILO (TARJETAS CLARAS) ---
+# --- ESTILO ---
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; }
@@ -35,33 +36,43 @@ for i, f in enumerate(favoritos):
 
 st.divider()
 
-# --- SECCIÓN 2: BUSCADOR CON ZOOM AUTOMÁTICO ---
+# --- SECCIÓN 2: BUSCADOR CON ZOOM OBLIGATORIO ---
 st.subheader("🔍 Analizador Detallado")
 ticker = st.text_input("Introduce un Ticker:", value="BBVA.MC").upper().strip()
 
 if ticker:
     try:
-        # Pedimos datos de 6 meses para que la curva se vea más detallada
-        data = yf.download(ticker, period="6mo", progress=False)
+        data = yf.download(ticker, period="1y", progress=False)
         if not data.empty:
-            precios = data['Close']
+            # Limpiamos los datos para Plotly
+            df_plot = data.reset_index()
             
             c1, c2 = st.columns([1, 3])
             with c1:
-                actual = float(precios.iloc[-1])
+                actual = float(data['Close'].iloc[-1])
                 st.metric(label=f"Precio {ticker}", value=f"{actual:.2f}€")
-                media_20 = float(precios.tail(20).mean())
+                media_20 = float(data['Close'].tail(20).mean())
                 if actual > media_20: st.success("🎯 SEÑAL: COMPRA")
                 else: st.error("🚨 SEÑAL: VENTA")
             
             with c2:
-                # --- AQUÍ ESTÁ EL TRUCO DEL ZOOM ---
-                # Usamos line_chart con el parámetro 'y_axis_label' no, 
-                # mejor forzamos los datos a una tabla limpia para que Streamlit haga zoom solo
-                st.line_chart(precios, color="#FF4B4B")
+                # --- AQUÍ ESTÁ EL CAMBIO "MÁGICO" ---
+                fig = px.line(df_plot, x='Date', y='Close', 
+                             color_discrete_sequence=['#FF4B4B']) # Tu rojo favorito
                 
-                # Si sigue saliendo plana, esta es la alternativa "mágica":
-                # st.area_chart(precios, color="#FF4B4B")
+                # Forzamos a que NO empiece en cero
+                fig.update_yaxes(autorange=True, fixedrange=False)
+                
+                # Quitamos fondos raros
+                fig.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font_color="white",
+                    margin=dict(l=0, r=0, t=0, b=0),
+                    height=300
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
                 
         else:
             st.warning("No hay datos disponibles.")
