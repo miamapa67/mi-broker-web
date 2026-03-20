@@ -17,18 +17,29 @@ st.markdown("""
     .venta { background-color: #fef2f2; border-left-color: #ef4444; color: #991b1b; }
     .badge { background-color: #1e293b; color: white; padding: 3px 8px; border-radius: 5px; font-size: 11px; margin-right: 5px; }
     h1, h2, h3, h4 { color: #1e293b !important; font-family: 'Segoe UI'; }
+    
+    /* Centrado de la imagen */
+    [data-testid="stImage"] {
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 1. CABECERA CON TU LOGO ---
+# --- 1. CABECERA CON TU LOGO (TAMAÑO AJUSTADO) ---
 if os.path.exists("logo_miguel.png"):
     img = Image.open("logo_miguel.png")
-    st.image(img, use_column_width=True)
+    # Hemos cambiado width=300 por width=150 para reducirlo a la mitad
+    st.image(img, width=150)
 
-st.title("🏹 Terminal de Inversión Inteligente - Miguel")
+st.markdown("<h1 style='text-align: center; color: black;'>📡 Scanner IBEX Pro - MIGUEL</h1>", unsafe_allow_html=True)
+st.write("<p style='text-align: center; color: grey;'>Analizando tendencia, volumen, riesgo (RSI) y dividendos.</p>", unsafe_allow_html=True)
 
 # --- 2. EL SUPER ESCÁNER (RSI + DIVIDENDOS + BACKTESTING) ---
 tickers = ["SAN.MC", "BBVA.MC", "TEF.MC", "IBE.MC", "ITX.MC", "REP.MC", "CABK.MC", "SAB.MC", "ENG.MC", "ELE.MC"]
+
+st.markdown("<br>", unsafe_allow_html=True) # Espacio
 
 if st.button('🚀 EJECUTAR ANÁLISIS COMPLETO DEL IBEX', use_container_width=True):
     col1, col2 = st.columns(2)
@@ -36,11 +47,13 @@ if st.button('🚀 EJECUTAR ANÁLISIS COMPLETO DEL IBEX', use_container_width=Tr
         for t in tickers:
             try:
                 t_obj = yf.Ticker(t)
-                df = t_obj.history(period="4mo")
+                # Descargamos datos con 'auto_adjust=False' para evitar avisos
+                df = yf.download(t, period="4mo", progress=False, auto_adjust=False)
                 if not df.empty:
                     # Datos Actuales
-                    actual = float(df['Close'].iloc[-1])
-                    precio_mes = float(df['Close'].iloc[-21])
+                    cierre = df['Close']
+                    actual = float(cierre.iloc[-1])
+                    precio_mes = float(cierre.iloc[-21]) if len(cierre) > 21 else actual
                     rent_mes = ((actual / precio_mes) - 1) * 100
                     
                     # Dividendo
@@ -48,7 +61,7 @@ if st.button('🚀 EJECUTAR ANÁLISIS COMPLETO DEL IBEX', use_container_width=Tr
                     div_p = div_yield * 100 if div_yield else 0
                     
                     # Cálculo RSI (Riesgo)
-                    delta = df['Close'].diff()
+                    delta = cierre.diff()
                     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
                     rs = gain / loss
@@ -68,7 +81,7 @@ if st.button('🚀 EJECUTAR ANÁLISIS COMPLETO DEL IBEX', use_container_width=Tr
                             <div class="card {clase}">
                                 <span class="badge">RSI: {rsi_val:.1f} ({msg_rsi})</span>
                                 <h3 style="margin:5px 0;">{t}: {actual:.2f}€</h3>
-                                <p style="margin:0;"><b>💰 Dividendo: {div_p:.2f}%</b></p>
+                                <p style="margin:0;"><b>💰 Dividendo Anual: {div_p:.2f}%</b></p>
                                 <p style="margin:0; font-size:14px;">Hace 30 días: {precio_mes:.2f}€ ({rent_mes:.2f}%)</p>
                             </div>
                         """, unsafe_allow_html=True)
@@ -88,7 +101,8 @@ with c1:
 with c2:
     try:
         t_sim = yf.Ticker(accion_e)
-        p_v = float(t_sim.history(period="1d")['Close'].iloc[-1])
+        data_sim = yf.download(accion_e, period="1d", progress=False, auto_adjust=False)
+        p_v = float(data_sim['Close'].iloc[-1])
         y_v = t_sim.info.get('dividendYield', 0)
         
         num_acciones = int(inversion / p_v)
