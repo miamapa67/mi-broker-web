@@ -2,56 +2,60 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 
-st.set_page_config(page_title="Estratega Robot", layout="wide")
+st.set_page_config(page_title="Monitor IBEX 35", layout="wide")
 
-st.title("🤖 Mi Analista Estratega - IBEX & Wall Street")
-st.write("Analizando tendencias con Medias Móviles (20 días)...")
+st.title("🇪🇸 Monitor en Tiempo Real: Los 35 del IBEX")
+st.write("Analizando tendencia y recomendación para todo el selectivo español.")
 
-tickers = ["SAN.MC", "TEF.MC", "ITX.MC", "BBVA.MC", "AAPL", "MSFT", "TSLA", "NVDA"]
+# Lista oficial de los 35 tickers de Yahoo Finance para el IBEX
+ibex_35 = [
+    "ANA.MC", "ACS.MC", "ACG.MC", "AENA.MC", "AMS.MC", "MTS.MC", "SAB.MC", "SAN.MC", 
+    "BKT.MC", "BBVA.MC", "CABK.MC", "CLNX.MC", "ENG.MC", "ELE.MC", "FER.MC", "FDR.MC", 
+    "GRF.MC", "IAG.MC", "IBE.MC", "ITX.MC", "IDR.MC", "COL.MC", "LOG.MC", "MAP.MC", 
+    "MEL.MC", "MRL.MC", "NTGY.MC", "PUIG.MC", "REE.MC", "REP.MC", "ROVI.MC", "SCYR.MC", 
+    "SLR.MC", "TEF.MC", "UNI.MC"
+]
 
 try:
-    # Descargamos datos de los últimos 40 días para calcular la media
-    data = yf.download(tickers, period="40d")['Close']
+    # Descargamos datos de 40 días para la media móvil
+    with st.spinner('Conectando con la Bolsa de Madrid...'):
+        data = yf.download(ibex_35, period="40d")['Close']
     
     if not data.empty:
-        st.subheader("📈 Análisis de Tendencias y Recomendación")
+        # Layout en columnas (5 por fila en PC)
+        cols = st.columns(5)
         
-        # Creamos columnas para que se vea profesional (de 4 en 4)
-        cols = st.columns(4)
-        
-        for i, ticker in enumerate(tickers):
-            with cols[i % 4]:
-                # Sacamos el precio actual y la media de los últimos 20 días
-                precio_actual = data[ticker].iloc[-1]
-                media_20 = data[ticker].tail(20).mean()
-                
-                # Lógica de tendencia
-                if precio_actual > media_20:
-                    recomendacion = "COMPRAR ✅"
-                    color = "normal" # Verde en Streamlit
-                    delta = f"Encima de media (+{((precio_actual/media_20)-1)*100:.2f}%)"
-                else:
-                    recomendacion = "VENDER ❌"
-                    color = "inverse" # Rojo en Streamlit
-                    delta = f"Debajo de media ({((precio_actual/media_20)-1)*100:.2f}%)"
-                
-                # Si es "nan" (mercado cerrado), avisamos
-                if pd.isna(precio_actual):
-                    st.metric(label=ticker, value="Cerrado")
-                else:
+        # Diccionario para nombres más legibles (opcional, aquí usamos el Ticker)
+        for i, ticker in enumerate(ibex_35):
+            with cols[i % 5]:
+                # Obtener último precio disponible (que no sea NaN)
+                serie_precios = data[ticker].dropna()
+                if not serie_precios.empty:
+                    precio_actual = serie_precios.iloc[-1]
+                    media_20 = serie_precios.tail(20).mean()
+                    
+                    # Lógica de inversión
+                    subida = precio_actual > media_20
+                    rec = "COMPRA" if subida else "VENTA"
+                    color_flecha = "normal" if subida else "inverse"
+                    pct = ((precio_actual/media_20)-1)*100
+                    
                     st.metric(
-                        label=f"{ticker} - {recomendacion}", 
-                        value=f"{precio_actual:.2f}", 
-                        delta=delta,
-                        delta_color=color
+                        label=f"{ticker.replace('.MC', '')} ({rec})",
+                        value=f"{precio_actual:.3f}€",
+                        delta=f"{pct:.2f}% vs media",
+                        delta_color=color_flecha
                     )
+                else:
+                    st.caption(f"{ticker}: Sin datos")
         
-        st.success("Análisis completado. Recuerda: esto es una ayuda técnica, no un consejo financiero legal.")
+        st.divider()
+        st.success("✅ Todos los valores del IBEX 35 analizados correctamente.")
     else:
-        st.error("No hay datos disponibles ahora mismo.")
+        st.error("No se pudo conectar con los datos del IBEX.")
 
 except Exception as e:
-    st.error(f"Error en el análisis: {e}")
+    st.error(f"Error técnico: {e}")
 
-st.write("---")
-st.caption("Estrategia basada en Cruce de Media Móvil Simple (SMA20)")
+st.caption("Estrategia: Tendencia alcista si Precio > Media Móvil 20 sesiones.")
+        
