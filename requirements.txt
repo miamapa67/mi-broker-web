@@ -1,6 +1,7 @@
 yfinance
 pandas
-streamlit
+streamlit==1.31.0
 plotly
 Pillow
+altair==5.2.0
 
