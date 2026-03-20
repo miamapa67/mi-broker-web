@@ -20,7 +20,8 @@ st.write("Analizando tendencias con Media Móvil de 20 sesiones (SMA20).")
 
 # --- LÓGICA DEL BUSCADOR ---
 if btn_buscar and ticker_buscado:
-st.write("---")
+if btn_buscar and ticker_buscado:
+    st.write("---")  # <--- ESTA LÍNEA TIENE QUE TENER 4 ESPACIOS ANTES
     st.subheader(f"📊 Análisis Detallado: {ticker_buscado}")
     
     try:
