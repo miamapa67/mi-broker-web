@@ -4,6 +4,10 @@ import pandas as pd
 import plotly.graph_objects as go
 from PIL import Image
 import os
+import warnings
+
+# Bloqueamos los avisos pesados de Yahoo para que no saturen la app
+warnings.filterwarnings('ignore')
 
 st.set_page_config(page_title="Miguel Terminal 360", layout="wide")
 
@@ -25,40 +29,46 @@ ibex_35 = [
     "ROVI.MC", "SCYR.MC", "SLBA.MC", "TEF.MC", "UNI.MC"
 ]
 
-# --- 3. LÓGICA DEL BOTÓN ---
+# --- 3. MOTOR DE ANÁLISIS ---
 if st.button('🚀 EJECUTAR ANÁLISIS TOTAL DEL MERCADO', use_container_width=True):
     lista_analisis = []
     progreso = st.progress(0)
+    contenedor_status = st.empty()
     
-    with st.spinner('Analizando los 35 valores...'):
-        for i, t in enumerate(ibex_35):
-            try:
-                # Descarga simplificada para evitar bloqueos
-                df = yf.download(t, period="6mo", interval="1d", progress=False)
-                if df.empty or len(df) < 15: continue
-                
-                # Extraer precio de forma segura (usando .values para evitar errores de Yahoo)
-                precio_act = float(df['Close'].values[-1])
-                
-                # Cálculo RSI
-                delta = df['Close'].diff()
-                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                rs = gain / loss
-                rsi_val = 100 - (100 / (1 + rs.values[-1]))
-                
-                # Estado visual
-                if rsi_val > 70: est, emoji = "🔴 RIESGO", "🔴"
-                elif rsi_val < 30: est, emoji = "🟢 COMPRA", "🟢"
-                else: est, emoji = "⚪ NEUTRO", "⚪"
-                
-                lista_analisis.append({
-                    "ticker": t, "precio": precio_actual, "rsi": float(rsi_val),
-                    "estado": est, "emoji": emoji, "df": df
-                })
-                progreso.progress((i + 1) / len(ibex_35))
-            except:
+    for i, t in enumerate(ibex_35):
+        try:
+            contenedor_status.text(f"Analizando {t} ({i+1}/35)...")
+            
+            # Descarga forzada con 'yf.download' simplificado
+            data = yf.download(t, period="6mo", interval="1d", progress=False, group_by='ticker')
+            
+            if data.empty or len(data) < 20:
                 continue
+            
+            # Limpiamos los datos para evitar el error 'Deprecation'
+            cierre = data['Close'].values.flatten()
+            precio_act = float(cierre[-1])
+            
+            # --- SEMÁFORO (CÁLCULO RSI LIMPIO) ---
+            delta = pd.Series(cierre).diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            rsi_val = 100 - (100 / (1 + rs.iloc[-1]))
+            
+            if rsi_val > 70: est, emoji = "🔴 RIESGO", "🔴"
+            elif rsi_val < 30: est, emoji = "🟢 COMPRA", "🟢"
+            else: est, emoji = "⚪ NEUTRO", "⚪"
+            
+            lista_analisis.append({
+                "ticker": t, "precio": precio_act, "rsi": float(rsi_val),
+                "estado": est, "emoji": emoji, "df": data
+            })
+            progreso.progress((i + 1) / len(ibex_35))
+        except:
+            continue
+
+    contenedor_status.empty()
 
     if lista_analisis:
         # --- RANKING ---
@@ -87,18 +97,16 @@ if st.button('🚀 EJECUTAR ANÁLISIS TOTAL DEL MERCADO', use_container_width=Tr
                     # VELAS JAPONESAS
                     fig = go.Figure(data=[go.Candlestick(
                         x=item['df'].index,
-                        open=item['df']['Open'],
-                        high=item['df']['High'],
-                        low=item['df']['Low'],
-                        close=item['df']['Close']
+                        open=item['df']['Open'].values.flatten(),
+                        high=item['df']['High'].values.flatten(),
+                        low=item['df']['Low'].values.flatten(),
+                        close=item['df']['Close'].values.flatten()
                     )])
                     fig.update_layout(height=180, margin=dict(l=0,r=0,t=0,b=0), xaxis_rangeslider_visible=False)
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    # LINKS
                     n_limpio = item['ticker'].split('.')[0]
                     st.markdown(f"[📰 Noticias](https://www.google.com/search?q={n_limpio}+noticias+bolsa&tbm=nws)")
-                    st.markdown(f"[📊 Gráfico](https://www.google.com/finance/quote/{item['ticker'].replace('.MC', ':BME')})")
 
 st.divider()
 # --- SIMULADOR ---
