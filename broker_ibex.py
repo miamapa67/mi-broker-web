@@ -1,10 +1,11 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import plotly.graph_objects as go # Librería para gráficos interactivos
 from PIL import Image
 import os
 
-st.set_page_config(page_title="Miguel Terminal Sectorial", layout="wide")
+st.set_page_config(page_title="Miguel Terminal Visual", layout="wide")
 
 # Estilo Blanco Nítido
 st.markdown("<style>.stApp { background-color: #ffffff; }</style>", unsafe_allow_html=True)
@@ -14,104 +15,87 @@ if os.path.exists("logo_miguel.png"):
     img = Image.open("logo_miguel.png")
     st.image(img, use_column_width=True)
 
-st.title("🏹 Terminal Sectorial - MIGUEL")
+st.title("🏹 Terminal Visual Interactiva - MIGUEL")
 
-# --- 2. DICCIONARIO DE SECTORES (IBEX 35) ---
+# --- 2. DICCIONARIO DE SECTORES ---
 sectores = {
-    "Todos los Sectores": [
-        "ANA.MC", "ACX.MC", "ACS.MC", "AENA.MC", "AMS.MC", "MTS.MC", "SAB.MC", "SAN.MC", "BKT.MC", "BBVA.MC",
-        "CABK.MC", "CLNX.MC", "ENG.MC", "ELE.MC", "FER.MC", "FDR.MC", "GRF.MC", "IAG.MC", "IBE.MC", "ITX.MC",
-        "IDR.MC", "COL.MC", "LOG.MC", "MAP.MC", "MEL.MC", "MRL.MC", "NTGY.MC", "PUIG.MC", "REE.MC", "REP.MC",
-        "ROVI.MC", "SCYR.MC", "SLBA.MC", "TEF.MC", "UNI.MC"
-    ],
+    "Todos los Sectores": ["ANA.MC", "ACX.MC", "ACS.MC", "AENA.MC", "AMS.MC", "MTS.MC", "SAB.MC", "SAN.MC", "BKT.MC", "BBVA.MC", "CABK.MC", "CLNX.MC", "ENG.MC", "ELE.MC", "FER.MC", "FDR.MC", "GRF.MC", "IAG.MC", "IBE.MC", "ITX.MC", "IDR.MC", "COL.MC", "LOG.MC", "MAP.MC", "MEL.MC", "MRL.MC", "NTGY.MC", "PUIG.MC", "REE.MC", "REP.MC", "ROVI.MC", "SCYR.MC", "SLBA.MC", "TEF.MC", "UNI.MC"],
     "Banca y Seguros": ["SAN.MC", "BBVA.MC", "CABK.MC", "SAB.MC", "BKT.MC", "UNI.MC", "MAP.MC"],
     "Energía y Petróleo": ["IBE.MC", "REP.MC", "NTGY.MC", "ELE.MC", "ENG.MC", "REE.MC", "SLBA.MC"],
-    "Construcción e Inmo": ["ACS.MC", "FER.MC", "ACC.MC", "SCYR.MC", "MRL.MC", "COL.MC"],
-    "Turismo y Viajes": ["IAG.MC", "MEL.MC", "AMS.MC", "AENA.MC"],
-    "Tecnología y Telco": ["TEF.MC", "CLNX.MC", "IDR.MC"],
-    "Consumo y Salud": ["ITX.MC", "GRF.MC", "ROVI.MC", "LOG.MC", "PUIG.MC", "FDR.MC", "ACX.MC", "MTS.MC"]
+    "Tecnología y Telco": ["TEF.MC", "CLNX.MC", "IDR.MC"]
 }
 
-# --- 3. FILTRO SUPERIOR ---
-st.markdown("### 🔍 Filtro de Mercado")
-sector_elegido = st.selectbox("Selecciona un sector para analizar:", list(sectores.keys()))
+sector_elegido = st.selectbox("Selecciona sector:", list(sectores.keys()))
 lista_tickers = sectores[sector_elegido]
 
-if st.button(f'🚀 ANALIZAR SECTOR: {sector_elegido.upper()}', use_container_width=True):
-    lista_analisis = []
+if st.button(f'🚀 ANALIZAR Y GENERAR GRÁFICOS: {sector_elegido.upper()}', use_container_width=True):
     
-    with st.spinner(f'Escaneando valores de {sector_elegido}...'):
+    with st.spinner('Construyendo gráficos de velas...'):
         for t in lista_tickers:
             try:
                 tk = yf.Ticker(t)
-                hist = tk.history(period="3mo")
-                if hist.empty: continue
+                # Bajamos 6 meses para que el gráfico tenga perspectiva
+                df = tk.history(period="6mo")
+                if df.empty: continue
                 
-                precio_actual = float(hist['Close'].iloc[-1])
-                info = tk.info
+                precio_act = float(df['Close'].iloc[-1])
                 
-                # RSI
-                delta = hist['Close'].diff()
+                # --- CÁLCULO RSI ---
+                delta = df['Close'].diff()
                 gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                 loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
                 rs = gain / loss
                 rsi_val = 100 - (100 / (1 + rs.iloc[-1]))
                 
-                # POTENCIAL
-                p_obj = info.get('targetMeanPrice')
-                potencial = ((p_obj - precio_actual) / precio_actual) * 100 if p_obj else 0
+                emo = "🟢" if rsi_val < 30 else "🔴" if rsi_val > 70 else "⚪"
                 
-                # DIVIDENDOS
-                div_yield = info.get('dividendYield', 0)
-                if not div_yield:
-                    divs = tk.dividends
-                    if not divs.empty: div_yield = (divs.iloc[-1] * 2) / precio_actual
-                
-                lista_analisis.append({
-                    "ticker": t, "precio": precio_actual, "rsi": rsi_val,
-                    "potencial": potencial, "div": div_yield * 100 if div_yield else 0
-                })
+                with st.expander(f"{emo} {t}: {precio_act:.2f}€ | Ver Análisis y Gráfico"):
+                    
+                    # --- GRÁFICO DE VELAS ---
+                    fig = go.Figure(data=[go.Candlestick(
+                        x=df.index,
+                        open=df['Open'],
+                        high=df['High'],
+                        low=df['Low'],
+                        close=df['Close'],
+                        name="Precio"
+                    )])
+                    
+                    fig.update_layout(
+                        title=f"Evolución 6 meses - {t}",
+                        yaxis_title="Precio (€)",
+                        xaxis_rangeslider_visible=False, # Quitamos la barra de abajo para que sea más limpio
+                        height=400,
+                        margin=dict(l=0, r=0, t=30, b=0)
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # --- DATOS EXTRA ---
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("RSI (Fuerza)", f"{rsi_val:.1f}")
+                    
+                    p_obj = tk.info.get('targetMeanPrice')
+                    if p_obj:
+                        pot = ((p_obj - precio_act) / precio_act) * 100
+                        c2.metric("Potencial", f"+{pot:.1f}%", delta_color="normal")
+                    
+                    n_n = t.split('.')[0]
+                    c3.markdown(f"**Noticias:** [👉 Google News]({https://www.google.com/search?q={n_n}+noticias+bolsa&tbm=nws})")
+
             except: continue
-
-    if lista_analisis:
-        df = pd.DataFrame(lista_analisis)
-        
-        # --- RANKINGS DEL SECTOR ---
-        st.markdown(f"## 🏆 Mejores del Sector: {sector_elegido}")
-        c_rank1, c_rank2 = st.columns(2)
-        with c_rank1:
-            st.success("💎 MÁS BARATOS (RSI)")
-            for _, row in df.sort_values(by="rsi").head(3).iterrows():
-                st.write(f"**{row['ticker']}** | RSI: {row['rsi']:.1f}")
-        with c_rank2:
-            st.info("🎯 MAYOR POTENCIAL (Analistas)")
-            for _, row in df.sort_values(by="potencial", ascending=False).head(3).iterrows():
-                st.write(f"**{row['ticker']}** | +{row['potencial']:.1f}%")
-
-        st.divider()
-
-        # --- DETALLE DEL SECTOR ---
-        cols = st.columns(3)
-        for i, item in enumerate(lista_analisis):
-            with cols[i % 3]:
-                emo = "🟢" if item['rsi'] < 30 else "🔴" if item['rsi'] > 70 else "⚪"
-                with st.expander(f"{emo} {item['ticker']}: {item['precio']:.2f}€"):
-                    st.write(f"**RSI:** {item['rsi']:.1f} | **Potencial:** +{item['potencial']:.1f}%")
-                    if item['div'] > 0: st.write(f"💰 **Div:** {item['div']:.2f}%")
-                    n_n = item['ticker'].split('.')[0]
-                    st.markdown(f"[📰 Noticias](https://www.google.com/search?q={n_n}+noticias+bolsa&tbm=nws)")
 
 st.divider()
 
-# --- 4. CALCULADORA ---
-st.subheader("💰 Simulador de Beneficios")
+# --- 3. CALCULADORA ---
+st.subheader("💰 Simulador de Inversión")
 c_sim1, c_sim2 = st.columns(2)
 with c_sim1:
     inver = st.number_input("Capital (€):", value=1000)
-    acc = st.selectbox("Elegir acción del sector:", lista_tickers)
+    acc = st.selectbox("Valor:", lista_tickers)
     sub = st.slider("Subida (%)", 1, 30, 10)
 with c_sim2:
     try:
         p_v = float(yf.Ticker(acc).history(period="1d")['Close'].iloc[-1])
-        st.success(f"**Ganancia: +{(p_v * (sub/100)) * (int(inver/p_v)):.2f}€**")
+        st.success(f"**Beneficio: +{(p_v * (sub/100)) * (int(inver/p_v)):.2f}€**")
     except: st.write("Calculando...")
