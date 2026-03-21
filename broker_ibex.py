@@ -4,7 +4,7 @@ import pandas as pd
 from PIL import Image
 import os
 
-st.set_page_config(page_title="Miguel Terminal Ranking", layout="wide")
+st.set_page_config(page_title="Miguel Terminal Premium", layout="wide")
 
 # Estilo Blanco Nítido
 st.markdown("<style>.stApp { background-color: #ffffff; }</style>", unsafe_allow_html=True)
@@ -14,8 +14,8 @@ if os.path.exists("logo_miguel.png"):
     img = Image.open("logo_miguel.png")
     st.image(img, use_column_width=True)
 
-st.title("🏹 Terminal Inteligente - MIGUEL")
-st.write("Ranking de Oportunidades y Riesgos en el IBEX 35.")
+st.title("🏹 Terminal Premium - MIGUEL")
+st.write("Análisis de RSI, Dividendos y Potencial de Revalorización (Analistas).")
 
 # --- 2. LISTA COMPLETA IBEX 35 ---
 ibex_35 = [
@@ -25,10 +25,10 @@ ibex_35 = [
     "ROVI.MC", "SCYR.MC", "SLBA.MC", "TEF.MC", "UNI.MC"
 ]
 
-if st.button('🚀 GENERAR RANKING Y ANALIZAR IBEX', use_container_width=True):
+if st.button('🚀 ESCANEAR POTENCIAL DE REVALORIZACIÓN', use_container_width=True):
     lista_analisis = []
     
-    with st.spinner('Escaneando el mercado...'):
+    with st.spinner('Consultando a los analistas y precios de mercado...'):
         for t in ibex_35:
             try:
                 tk = yf.Ticker(t)
@@ -36,16 +36,23 @@ if st.button('🚀 GENERAR RANKING Y ANALIZAR IBEX', use_container_width=True):
                 if hist.empty: continue
                 
                 precio_actual = float(hist['Close'].iloc[-1])
+                info = tk.info
                 
-                # CÁLCULO RSI
+                # --- POTENCIAL DE REVALORIZACIÓN ---
+                precio_objetivo = info.get('targetMeanPrice')
+                potencial = 0
+                if precio_objetivo:
+                    potencial = ((precio_objetivo - precio_actual) / precio_actual) * 100
+                
+                # --- RSI ---
                 delta = hist['Close'].diff()
                 gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                 loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
                 rs = gain / loss
                 rsi_val = 100 - (100 / (1 + rs.iloc[-1]))
                 
-                # DIVIDENDOS
-                div_yield = tk.info.get('dividendYield', 0)
+                # --- DIVIDENDOS ---
+                div_yield = info.get('dividendYield', 0)
                 if not div_yield:
                     divs = tk.dividends
                     if not divs.empty: div_yield = (divs.iloc[-1] * 2) / precio_actual
@@ -53,54 +60,54 @@ if st.button('🚀 GENERAR RANKING Y ANALIZAR IBEX', use_container_width=True):
                 lista_analisis.append({
                     "ticker": t,
                     "precio": precio_actual,
+                    "target": precio_objetivo,
+                    "potencial": potencial,
                     "rsi": rsi_val,
                     "div": div_yield * 100 if div_yield else 0
                 })
-            except: 
-                continue # Si una acción falla, pasamos a la siguiente
+            except: continue
 
     if lista_analisis:
         df_ranking = pd.DataFrame(lista_analisis)
-        top_compras = df_ranking.sort_values(by="rsi").head(3)
-        top_ventas = df_ranking.sort_values(by="rsi", ascending=False).head(3)
-
-        col_rank1, col_rank2 = st.columns(2)
-        with col_rank1:
-            st.markdown("### 💎 TOP 3: COMPRA")
-            for _, row in top_compras.iterrows():
-                st.success(f"**{row['ticker']}** | RSI: {row['rsi']:.1f} | {row['precio']:.2f}€")
-        with col_rank2:
-            st.markdown("### ⚠️ TOP 3: RIESGO")
-            for _, row in top_ventas.iterrows():
-                st.error(f"**{row['ticker']}** | RSI: {row['rsi']:.1f} | {row['precio']:.2f}€")
         
+        # TOP 3 POR POTENCIAL (Los que más pueden subir según analistas)
+        top_potencial = df_ranking.sort_values(by="potencial", ascending=False).head(3)
+        
+        st.markdown("### 🎯 TOP 3: MAYOR POTENCIAL DE SUBIDA (Analistas)")
+        c_p1, c_p2, c_p3 = st.columns(3)
+        tops = [c_p1, c_p2, c_p3]
+        for idx, (_, row) in enumerate(top_potencial.iterrows()):
+            with tops[idx]:
+                st.info(f"**{row['ticker']}**\n\nPotencial: **+{row['potencial']:.1f}%**\n\nPrecio Objetivo: {row['target']:.2f}€")
+
         st.divider()
 
-        # --- DETALLE DE LOS 35 (LÍNEA 99 CORREGIDA) ---
-        st.subheader("📊 Detalle de los 35 Valores")
+        # --- DETALLE GENERAL ---
+        st.subheader("📊 Análisis Detallado de los 35")
         cols = st.columns(3)
         for i, item in enumerate(lista_analisis):
             with cols[i % 3]:
                 emoji = "🟢" if item['rsi'] < 30 else "🔴" if item['rsi'] > 70 else "⚪"
                 with st.expander(f"{emoji} {item['ticker']}: {item['precio']:.2f}€"):
-                    st.write(f"**Fuerza (RSI):** {item['rsi']:.1f}")
-                    if item['div'] > 0: st.write(f"💰 **Div:** {item['div']:.2f}%")
+                    st.write(f"**RSI:** {item['rsi']:.1f}")
+                    if item['potencial'] > 0:
+                        st.write(f"🚀 **Potencial:** +{item['potencial']:.1f}%")
+                    if item['div'] > 0:
+                        st.write(f"💰 **Div:** {item['div']:.2f}%")
                     
                     nombre_n = item['ticker'].split('.')[0]
-                    # Aquí estaba el error (corregido):
                     url_news = f"https://www.google.com/search?q={nombre_n}+noticias+bolsa&tbm=nws"
-                    st.markdown(f"[📰 Noticias]({url_news})")
-                    st.markdown(f"[📊 Gráfico](https://www.google.com/finance/quote/{item['ticker'].replace('.MC', ':BME')})")
+                    st.markdown(f"[📰 Noticias]({url_news}) | [📊 Gráfico](https://www.google.com/finance/quote/{item['ticker'].replace('.MC', ':BME')})")
 
 st.divider()
 
 # --- CALCULADORA ---
-st.subheader("💰 Simulador de Inversión")
+st.subheader("💰 Simulador de Beneficios")
 c1, c2 = st.columns(2)
 with c1:
     inver = st.number_input("Capital (€):", value=1000)
     acc_elegida = st.selectbox("Valor:", ibex_35)
-    sub_obj = st.slider("Subida (%)", 1, 30, 5)
+    sub_obj = st.slider("Subida objetivo (%)", 1, 30, 10)
 with c2:
     try:
         p_v = float(yf.Ticker(acc_elegida).history(period="1d")['Close'].iloc[-1])
