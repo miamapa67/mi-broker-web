@@ -15,7 +15,7 @@ if os.path.exists("logo_miguel.png"):
     st.image(img, use_column_width=True)
 
 st.title("🏹 Terminal Inteligente - MIGUEL")
-st.write("Ranking automático de Oportunidades y Riesgos en el IBEX 35.")
+st.write("Ranking de Oportunidades y Riesgos en el IBEX 35.")
 
 # --- 2. LISTA COMPLETA IBEX 35 ---
 ibex_35 = [
@@ -28,7 +28,7 @@ ibex_35 = [
 if st.button('🚀 GENERAR RANKING Y ANALIZAR IBEX', use_container_width=True):
     lista_analisis = []
     
-    with st.spinner('Escaneando el mercado para encontrar las mejores joyas...'):
+    with st.spinner('Escaneando el mercado...'):
         for t in ibex_35:
             try:
                 tk = yf.Ticker(t)
@@ -37,7 +37,7 @@ if st.button('🚀 GENERAR RANKING Y ANALIZAR IBEX', use_container_width=True):
                 
                 precio_actual = float(hist['Close'].iloc[-1])
                 
-                # CÁLCULO RSI (Semáforo)
+                # CÁLCULO RSI
                 delta = hist['Close'].diff()
                 gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                 loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
@@ -56,61 +56,54 @@ if st.button('🚀 GENERAR RANKING Y ANALIZAR IBEX', use_container_width=True):
                     "rsi": rsi_val,
                     "div": div_yield * 100 if div_yield else 0
                 })
-            except: continue
+            except: 
+                continue # Si una acción falla, pasamos a la siguiente
 
-    # --- 3. MOSTRAR RANKINGS ---
     if lista_analisis:
         df_ranking = pd.DataFrame(lista_analisis)
-        
-        # TOP 3 OPORTUNIDADES (RSI más bajo = más barato)
         top_compras = df_ranking.sort_values(by="rsi").head(3)
-        # TOP 3 RIESGOS (RSI más alto = más caro/inflado)
         top_ventas = df_ranking.sort_values(by="rsi", ascending=False).head(3)
 
         col_rank1, col_rank2 = st.columns(2)
-        
         with col_rank1:
-            st.markdown("### 💎 TOP 3: OPORTUNIDADES (COMPRA)")
+            st.markdown("### 💎 TOP 3: COMPRA")
             for _, row in top_compras.iterrows():
-                st.success(f"**{row['ticker']}** | RSI: {row['rsi']:.1f} | Precio: {row['precio']:.2f}€")
-        
+                st.success(f"**{row['ticker']}** | RSI: {row['rsi']:.1f} | {row['precio']:.2f}€")
         with col_rank2:
-            st.markdown("### ⚠️ TOP 3: RIESGO (VENTA/CARO)")
+            st.markdown("### ⚠️ TOP 3: RIESGO")
             for _, row in top_ventas.iterrows():
-                st.error(f"**{row['ticker']}** | RSI: {row['rsi']:.1f} | Precio: {row['precio']:.2f}€")
+                st.error(f"**{row['ticker']}** | RSI: {row['rsi']:.1f} | {row['precio']:.2f}€")
         
         st.divider()
 
-        # --- 4. LISTADO GENERAL (3 COLUMNAS) ---
+        # --- DETALLE DE LOS 35 (LÍNEA 99 CORREGIDA) ---
         st.subheader("📊 Detalle de los 35 Valores")
         cols = st.columns(3)
         for i, item in enumerate(lista_analisis):
             with cols[i % 3]:
-                # Color de la tarjeta según RSI
-                if item['rsi'] < 30: color_card = "🟢"
-                elif item['rsi'] > 70: color_card = "🔴"
-                else: color_card = "⚪"
-                
-                with st.expander(f"{color_card} {item['ticker']}: {item['precio']:.2f}€"):
+                emoji = "🟢" if item['rsi'] < 30 else "🔴" if item['rsi'] > 70 else "⚪"
+                with st.expander(f"{emoji} {item['ticker']}: {item['precio']:.2f}€"):
                     st.write(f"**Fuerza (RSI):** {item['rsi']:.1f}")
                     if item['div'] > 0: st.write(f"💰 **Div:** {item['div']:.2f}%")
                     
                     nombre_n = item['ticker'].split('.')[0]
-                    st.markdown(f"[📰 Noticias]({https://www.google.com/search?q={nombre_n}+noticias+bolsa&tbm=nws}) | [📊 Gráfico](https://www.google.com/finance/quote/{item['ticker'].replace('.MC', ':BME')})")
+                    # Aquí estaba el error (corregido):
+                    url_news = f"https://www.google.com/search?q={nombre_n}+noticias+bolsa&tbm=nws"
+                    st.markdown(f"[📰 Noticias]({url_news})")
+                    st.markdown(f"[📊 Gráfico](https://www.google.com/finance/quote/{item['ticker'].replace('.MC', ':BME')})")
 
 st.divider()
 
-# --- 5. CALCULADORA ---
+# --- CALCULADORA ---
 st.subheader("💰 Simulador de Inversión")
 c1, c2 = st.columns(2)
 with c1:
     inver = st.number_input("Capital (€):", value=1000)
-    acc_elegida = st.selectbox("Valor del Ranking:", ibex_35)
-    sub_obj = st.slider("Subida objetivo (%)", 1, 30, 5)
+    acc_elegida = st.selectbox("Valor:", ibex_35)
+    sub_obj = st.slider("Subida (%)", 1, 30, 5)
 with c2:
     try:
         p_v = float(yf.Ticker(acc_elegida).history(period="1d")['Close'].iloc[-1])
         n_acc = int(inver / p_v)
-        st.info(f"Comprarías {n_acc} acciones.")
         st.success(f"**Ganancia: +{(p_v * (sub_obj/100)) * n_acc:.2f}€**")
-    except: st.write("Selecciona un valor...")
+    except: st.write("Calculando...")
