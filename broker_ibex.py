@@ -25,38 +25,43 @@ ibex_35 = [
     "ROVI.MC", "SCYR.MC", "SLBA.MC", "TEF.MC", "UNI.MC"
 ]
 
+# --- 3. LÓGICA DEL BOTÓN ---
 if st.button('🚀 EJECUTAR ANÁLISIS TOTAL DEL MERCADO', use_container_width=True):
     lista_analisis = []
+    progreso = st.progress(0)
     
-    with st.spinner('Procesando el IBEX 35...'):
-        for t in ibex_35:
+    with st.spinner('Analizando los 35 valores...'):
+        for i, t in enumerate(ibex_35):
             try:
-                # Forzamos la descarga de los últimos 6 meses
+                # Descarga simplificada para evitar bloqueos
                 df = yf.download(t, period="6mo", interval="1d", progress=False)
-                if df.empty: continue
+                if df.empty or len(df) < 15: continue
                 
-                # Extraer precio actual
-                precio_act = float(df['Close'].iloc[-1])
+                # Extraer precio de forma segura (usando .values para evitar errores de Yahoo)
+                precio_act = float(df['Close'].values[-1])
                 
-                # --- CÁLCULO RSI ---
+                # Cálculo RSI
                 delta = df['Close'].diff()
                 gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                 loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
                 rs = gain / loss
-                rsi_val = 100 - (100 / (1 + rs.iloc[-1]))
+                rsi_val = 100 - (100 / (1 + rs.values[-1]))
                 
-                if rsi_val > 70: est, color_c = "🔴 RIESGO", "#fef2f2"
-                elif rsi_val < 30: est, color_c = "🟢 COMPRA", "#f0fdf4"
-                else: est, color_c = "⚪ NEUTRO", "#f8fafc"
+                # Estado visual
+                if rsi_val > 70: est, emoji = "🔴 RIESGO", "🔴"
+                elif rsi_val < 30: est, emoji = "🟢 COMPRA", "🟢"
+                else: est, emoji = "⚪ NEUTRO", "⚪"
                 
                 lista_analisis.append({
-                    "ticker": t, "precio": precio_act, "rsi": float(rsi_val),
-                    "estado": est, "df": df
+                    "ticker": t, "precio": precio_actual, "rsi": float(rsi_val),
+                    "estado": est, "emoji": emoji, "df": df
                 })
-            except: continue
+                progreso.progress((i + 1) / len(ibex_35))
+            except:
+                continue
 
     if lista_analisis:
-        # --- RANKING TOP 3 ---
+        # --- RANKING ---
         df_rank = pd.DataFrame(lista_analisis)
         t_compras = df_rank.sort_values(by="rsi").head(3)
         t_ventas = df_rank.sort_values(by="rsi", ascending=False).head(3)
@@ -73,14 +78,13 @@ if st.button('🚀 EJECUTAR ANÁLISIS TOTAL DEL MERCADO', use_container_width=Tr
         
         st.divider()
 
-        # --- RADIOGRAFÍA (DETALLE) ---
+        # --- RADIOGRAFÍA ---
         st.subheader("📊 Radiografía de los 35 Valores")
         columnas = st.columns(3)
-        
         for i, item in enumerate(lista_analisis):
             with columnas[i % 3]:
-                with st.expander(f"{item['estado'].split(' ')[0]} {item['ticker']}: {item['precio']:.2f}€"):
-                    # GRÁFICO DE VELAS
+                with st.expander(f"{item['emoji']} {item['ticker']}: {item['precio']:.2f}€"):
+                    # VELAS JAPONESAS
                     fig = go.Figure(data=[go.Candlestick(
                         x=item['df'].index,
                         open=item['df']['Open'],
@@ -88,25 +92,20 @@ if st.button('🚀 EJECUTAR ANÁLISIS TOTAL DEL MERCADO', use_container_width=Tr
                         low=item['df']['Low'],
                         close=item['df']['Close']
                     )])
-                    fig.update_layout(height=200, margin=dict(l=0,r=0,t=0,b=0), xaxis_rangeslider_visible=False)
+                    fig.update_layout(height=180, margin=dict(l=0,r=0,t=0,b=0), xaxis_rangeslider_visible=False)
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    # INFO Y NOTICIAS (Aquí estaba el error)
+                    # LINKS
                     n_limpio = item['ticker'].split('.')[0]
-                    st.write(f"**RSI:** {item['rsi']:.1f}")
-                    
-                    # Enlaces limpios
-                    url_n = f"https://www.google.com/search?q={n_limpio}+noticias+bolsa&tbm=nws"
-                    url_g = f"https://www.google.com/finance/quote/{item['ticker'].replace('.MC', ':BME')}"
-                    
-                    st.markdown(f"[📰 Noticias]({url_n}) | [📊 Gráfico Real]({url_g})")
+                    st.markdown(f"[📰 Noticias](https://www.google.com/search?q={n_limpio}+noticias+bolsa&tbm=nws)")
+                    st.markdown(f"[📊 Gráfico](https://www.google.com/finance/quote/{item['ticker'].replace('.MC', ':BME')})")
 
 st.divider()
-# --- CALCULADORA ---
+# --- SIMULADOR ---
 st.subheader("💰 Simulador")
 inv = st.number_input("Dinero (€):", value=1000)
 acc = st.selectbox("Acción:", ibex_35)
 try:
-    p_act = float(yf.download(acc, period="1d", progress=False)['Close'].iloc[-1])
-    st.info(f"Comprarías {int(inv/p_act)} acciones de {acc}")
+    p_sim = float(yf.download(acc, period="1d", progress=False)['Close'].values[-1])
+    st.info(f"Comprarías {int(inv/p_sim)} acciones de {acc}")
 except: pass
