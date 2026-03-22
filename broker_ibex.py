@@ -1,17 +1,24 @@
 import streamlit as st
-import pandas as pd
 import yfinance as yf
+import pandas as pd
 import plotly.graph_objects as go
+from PIL import Image
+import os
 
-st.set_page_config(page_title="Miguel Terminal 35", layout="wide")
+st.set_page_config(page_title="Miguel Terminal 360 Pro", layout="wide")
 
-# Estilo Profesional
+# Estilo Blanco Nítido Profesional
 st.markdown("<style>.stApp { background-color: #ffffff; }</style>", unsafe_allow_html=True)
 
-st.title("🏹 Terminal IBEX 35 Completa - MIGUEL")
-st.write("Análisis en tiempo real de los 35 valores del mercado español.")
+# --- 1. CABECERA ---
+if os.path.exists("logo_miguel.png"):
+    img = Image.open("logo_miguel.png")
+    st.image(img, use_column_width=True)
 
-# --- 1. LISTA COMPLETA DE LOS 35 VALORES ---
+st.title("🏹 Terminal Inteligente IBEX 35 - MIGUEL")
+st.write("Análisis de Oportunidades, Semáforos, Gráficos de Velas y Noticias en Tiempo Real.")
+
+# --- 2. LISTA OFICIAL DE LOS 35 DEL IBEX ---
 ibex_35 = [
     "ANA.MC", "ACX.MC", "ACS.MC", "AENA.MC", "AMS.MC", "MTS.MC", "SAB.MC", "SAN.MC", "BKT.MC", "BBVA.MC",
     "CABK.MC", "CLNX.MC", "ENG.MC", "ELE.MC", "FER.MC", "FDR.MC", "GRF.MC", "IAG.MC", "IBE.MC", "ITX.MC",
@@ -19,73 +26,79 @@ ibex_35 = [
     "ROVI.MC", "SCYR.MC", "SLBA.MC", "TEF.MC", "UNI.MC"
 ]
 
-# --- 2. BOTÓN DE ESCÁNER TOTAL ---
-if st.button('🚀 ESCANEAR LOS 35 VALORES DEL IBEX', use_container_width=True):
-    lista_resultados = []
+# --- 3. BOTÓN DE ESCÁNER TOTAL ---
+if st.button('🚀 EJECUTAR ANÁLISIS 360 (LOS 35 VALORES)', use_container_width=True):
+    lista_analisis = []
     progreso = st.progress(0)
-    status_text = st.empty()
+    status = st.empty()
     
-    for i, t in enumerate(ibex_35):
-        try:
-            status_text.text(f"Analizando {t} ({i+1}/35)...")
-            tk = yf.Ticker(t)
-            df = tk.history(period="6mo")
-            
-            if not df.empty:
-                p_act = float(df['Close'].iloc[-1])
-                # Cálculo de RSI para el semáforo
-                delta = df['Close'].diff()
-                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                rs = gain.iloc[-1] / (loss.iloc[-1] + 0.00001)
-                rsi = 100 - (100 / (1 + rs))
+    with st.spinner('Escaneando el mercado español...'):
+        for i, t in enumerate(ibex_35):
+            try:
+                status.text(f"Analizando {t} ({i+1}/35)...")
+                # Descarga de datos (6 meses para las velas y el RSI)
+                df = yf.download(t, period="6mo", interval="1d", progress=False)
                 
-                # Definir filtros/colores
-                if rsi < 35: sem, est, col = "🟢", "COMPRA", "green"
-                elif rsi > 65: sem, est, col = "🔴", "RIESGO", "red"
-                else: sem, est, col = "⚪", "NEUTRO", "gray"
-                
-                lista_resultados.append({
-                    "ticker": t, "precio": p_act, "rsi": rsi, 
-                    "semaforo": sem, "estado": est, "df": df
-                })
-            progreso.progress((i + 1) / len(ibex_35))
-        except:
-            continue
-    
-    status_text.empty()
+                if not df.empty and len(df) > 14:
+                    precio_act = float(df['Close'].values[-1])
+                    
+                    # --- CÁLCULO RSI (SEMÁFORO) ---
+                    delta = df['Close'].diff()
+                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                    rs = gain.values[-1] / (loss.values[-1] + 0.00001)
+                    rsi_val = 100 - (100 / (1 + rs))
+                    
+                    # Clasificación para Filtros
+                    if rsi_val < 35: sem, est, col = "🟢", "COMPRA", "green"
+                    elif rsi_val > 65: sem, est, col = "🔴", "RIESGO", "red"
+                    else: sem, est, col = "⚪", "NEUTRO", "gray"
+                    
+                    lista_analisis.append({
+                        "ticker": t, "precio": precio_act, "rsi": float(rsi_val),
+                        "estado": est, "emoji": sem, "df": df
+                    })
+                progreso.progress((i + 1) / len(ibex_35))
+            except: continue
 
-    if lista_resultados:
-        df_final = pd.DataFrame(lista_resultados)
+    status.empty()
+
+    if lista_analisis:
+        df_rank = pd.DataFrame(lista_analisis)
         
-        # --- 3. FILTROS / RANKINGS ---
-        st.subheader("🏆 Filtro de Oportunidades")
-        col_f1, col_f2, col_f3 = st.columns(3)
+        # --- 4. RANKING TOP 3 Y FILTROS ---
+        st.subheader("🏆 Filtro de Oportunidades y Riesgos")
+        f1, f2, f3 = st.columns(3)
         
-        with col_f1:
-            mejores = df_final[df_final['estado'] == 'COMPRA']
-            st.success(f"💎 Oportunidades de Compra: {len(mejores)}")
-            for ticker in mejores['ticker'].head(3): st.write(f"· {ticker}")
-            
-        with col_f2:
-            neutros = df_final[df_final['estado'] == 'NEUTRO']
-            st.info(f"⚪ Valores en Calma: {len(neutros)}")
-            
-        with col_f3:
-            riesgos = df_final[df_final['estado'] == 'RIESGO']
-            st.error(f"⚠️ Alertas de Riesgo: {len(riesgos)}")
-            for ticker in riesgos['ticker'].head(3): st.write(f"· {ticker}")
+        with f1:
+            mejores = df_rank.sort_values(by="rsi").head(3)
+            st.success("💎 TOP 3: MEJOR COMPRA")
+            for _, r in mejores.iterrows():
+                st.write(f"**{r['ticker']}** (RSI: {r['rsi']:.1f})")
+        
+        with f2:
+            neutros = df_rank[df_rank['estado'] == 'NEUTRO']
+            st.info(f"⚪ VALORES EN CALMA: {len(neutros)}")
+            st.write("Mercado estable para estos valores.")
+
+        with f3:
+            peores = df_rank.sort_values(by="rsi", ascending=False).head(3)
+            st.error("⚠️ TOP 3: MÁS RIESGO")
+            for _, r in peores.iterrows():
+                st.write(f"**{r['ticker']}** (RSI: {r['rsi']:.1f})")
 
         st.divider()
 
-        # --- 4. CUADRÍCULA DE LOS 35 VALORES ---
-        st.subheader("📊 Los 35 del IBEX")
-        columnas_valores = st.columns(3)
-        for idx, item in enumerate(lista_resultados):
-            with columnas_valores[idx % 3]:
-                with st.expander(f"{item['semaforo']} {item['ticker']}: {item['precio']:.2f}€"):
-                    st.write(f"**Estado:** {item['estado']} (RSI: {item['rsi']:.1f})")
-                    # Gráfico de Velas
+        # --- 5. DETALLE DE LOS 35 (VELAS, SEMÁFORO Y NOTICIAS) ---
+        st.subheader("📊 Radiografía Detallada de los 35")
+        columnas = st.columns(3)
+        
+        for idx, item in enumerate(lista_analisis):
+            with columnas[idx % 3]:
+                with st.expander(f"{item['emoji']} {item['ticker']}: {item['precio']:.2f}€"):
+                    st.write(f"**Fuerza RSI:** {item['rsi']:.1f} | **Estado:** {item['estado']}")
+                    
+                    # Gráfico Interactivo de Velas Japonesas
                     fig = go.Figure(data=[go.Candlestick(
                         x=item['df'].index[-30:],
                         open=item['df']['Open'][-30:],
@@ -93,15 +106,23 @@ if st.button('🚀 ESCANEAR LOS 35 VALORES DEL IBEX', use_container_width=True):
                         low=item['df']['Low'][-30:],
                         close=item['df']['Close'][-30:]
                     )])
-                    fig.update_layout(height=180, margin=dict(l=0,r=0,t=0,b=0), xaxis_rangeslider_visible=False)
+                    fig.update_layout(height=200, margin=dict(l=0,r=0,t=0,b=0), xaxis_rangeslider_visible=False)
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    # Noticias
-                    nombre = item['ticker'].split('.')[0]
-                    st.markdown(f"[📰 Ver Noticias de {nombre}](https://www.google.com/search?q={nombre}+noticias+bolsa&tbm=nws)")
-    else:
-        st.error("No se han podido cargar los datos. Por favor, reintenta en unos minutos.")
+                    # Radar de Noticias e Info
+                    n_limpio = item['ticker'].split('.')[0]
+                    st.markdown(f"[📰 Noticias de {n_limpio}](https://www.google.com/search?q={n_limpio}+noticias+bolsa&tbm=nws)")
+                    st.markdown(f"[📊 Google Finance](https://www.google.com/finance/quote/{item['ticker'].replace('.MC', ':BME')})")
 
 st.divider()
-st.subheader("💰 Simulador de Inversión")
-inv = st.number_input("Capital a invertir (€):", value=1000)
+
+# --- 6. CALCULADORA DE INVERSIÓN ---
+st.subheader("💰 Simulador de Inversión Miguel")
+c_sim1, c_sim2 = st.columns(2)
+with c_sim1:
+    inv = st.number_input("Dinero a invertir (€):", value=1000, step=500)
+    acc = st.selectbox("Elegir Acción:", ibex_35)
+with c_sim2:
+    subida = st.slider("Subida esperada (%)", 1, 30, 10)
+    ganancia = inv * (subida/100)
+    st.metric("Beneficio Estimado", f"+{ganancia:.2f}€", f"{subida}%")
