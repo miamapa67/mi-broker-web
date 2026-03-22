@@ -1,50 +1,111 @@
 import streamlit as st
+import yfinance as yf
+import pandas as pd
+import plotly.graph_objects as go
+import time
 
-st.set_page_config(page_title="Miguel Terminal 35", layout="wide")
-
-# Estilo Limpio
+st.set_page_config(page_title="Miguel Terminal 360", layout="wide")
 st.markdown("<style>.stApp { background-color: #ffffff; }</style>", unsafe_allow_html=True)
 
-st.title("🏹 Terminal IBEX 35 - CONTROL TOTAL")
-st.write("### 🚀 Panel de Acceso Directo y Análisis")
+st.title("🏹 Terminal Inteligente IBEX 35 - MIGUEL")
 
-# --- LISTA OFICIAL 35 VALORES ---
-ibex_35 = {
-    "Acciona": "ANA:BME", "Acerinox": "ACX:BME", "ACS": "ACS:BME", "AENA": "AENA:BME", 
-    "Amadeus": "AMS:BME", "ArcelorMittal": "MTS:BME", "Sabadell": "SAB:BME", "Santander": "SAN:BME", 
-    "Bankinter": "BKT:BME", "BBVA": "BBVA:BME", "CaixaBank": "CABK:BME", "Cellnex": "CLNX:BME", 
-    "Enagás": "ENG:BME", "Endesa": "ELE:BME", "Ferrovial": "FER:BME", "Fluidra": "FDR:BME", 
-    "Grifols": "GRF:BME", "IAG": "IAG:BME", "Iberdrola": "IBE:BME", "Inditex": "ITX:BME", 
-    "Indra": "IDR:BME", "Inm. Colonial": "COL:BME", "Logista": "LOG:BME", "Mapfre": "MAP:BME", 
-    "Meliá Hotels": "MEL:BME", "Merlin Prop.": "MRL:BME", "Naturgy": "NTGY:BME", "Puig": "PUIG:BME", 
-    "Redeia": "REE:BME", "Repsol": "REP:BME", "Rovi": "ROVI:BME", "Sacyr": "SCYR:BME", 
-    "Solaria": "SLBA:BME", "Telefónica": "TEF:BME", "Unicaja": "UNI:BME"
-}
+# --- 1. LISTA COMPLETA 35 VALORES ---
+ibex_35 = [
+    "ANA.MC", "ACX.MC", "ACS.MC", "AENA.MC", "AMS.MC", "MTS.MC", "SAB.MC", "SAN.MC", "BKT.MC", "BBVA.MC",
+    "CABK.MC", "CLNX.MC", "ENG.MC", "ELE.MC", "FER.MC", "FDR.MC", "GRF.MC", "IAG.MC", "IBE.MC", "ITX.MC",
+    "IDR.MC", "COL.MC", "LOG.MC", "MAP.MC", "MEL.MC", "MRL.MC", "NTGY.MC", "PUIG.MC", "REE.MC", "REP.MC",
+    "ROVI.MC", "SCYR.MC", "SLBA.MC", "TEF.MC", "UNI.MC"
+]
 
-# --- FILTROS RÁPIDOS ---
-st.info("💡 Haz clic en cualquier valor para abrir su Gráfico Interactivo y Noticias en tiempo real (Sin bloqueos).")
-
-columnas = st.columns(4) # 4 columnas para que quepan todos
-for i, (nombre, ticker) in enumerate(ibex_35.items()):
-    with columnas[i % 4]:
-        url = f"https://www.google.com/finance/quote/{ticker}"
-        st.link_button(f"📊 {nombre}", url, use_container_width=True)
-
-st.divider()
-
-# --- CALCULADORA DE BENEFICIOS (PLANIFICADOR) ---
-st.subheader("💰 Calculadora de Operaciones")
-c1, c2 = st.columns(2)
-
-with c1:
-    capital = st.number_input("Capital a invertir (€):", value=1000, step=100)
-    precio_c = st.number_input("Precio de entrada (€):", value=10.0, step=0.1)
+# --- 2. BOTÓN DE ESCÁNER TOTAL ---
+if st.button('🚀 EJECUTAR ANÁLISIS 360 (SEMÁFOROS Y FILTROS)', use_container_width=True):
+    lista_analisis = []
+    progreso = st.progress(0)
+    status = st.empty()
     
-with c2:
-    objetivo = st.slider("Objetivo de subida (%)", 1, 30, 10)
-    ganancia = capital * (objetivo / 100)
-    st.metric("Beneficio Estimado", f"+{ganancia:.2f}€", f"{objetivo}%")
-    st.write(f"Si la acción llega a **{precio_c * (1 + objetivo/100):.2f}€**, habrás ganado la operación.")
+    with st.spinner('Analizando los 35 valores...'):
+        for i, t in enumerate(ibex_35):
+            try:
+                status.text(f"Procesando {t}... ({i+1}/35)")
+                # Descarga protegida: solo 1 mes para evitar bloqueos
+                df = yf.download(t, period="1mo", interval="1d", progress=False, timeout=5)
+                
+                if not df.empty and len(df) > 10:
+                    precio_act = float(df['Close'].iloc[-1])
+                    
+                    # CÁLCULO RSI (EL MOTOR DEL SEMÁFORO)
+                    delta = df['Close'].diff()
+                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                    rsi = 100 - (100 / (1 + (gain.iloc[-1] / (loss.iloc[-1] + 0.001))))
+                    
+                    # Clasificación para Filtros
+                    if rsi < 35: sem, est = "🟢", "COMPRA"
+                    elif rsi > 65: sem, est = "🔴", "RIESGO"
+                    else: sem, est = "⚪", "NEUTRO"
+                    
+                    lista_analisis.append({
+                        "ticker": t, "precio": precio_act, "rsi": rsi, 
+                        "emoji": sem, "estado": est, "df": df
+                    })
+                
+                # Pausa técnica para que Yahoo no nos bloquee
+                time.sleep(0.2)
+                progreso.progress((i + 1) / len(ibex_35))
+            except:
+                continue
+
+    status.empty()
+
+    if lista_analisis:
+        df_rank = pd.DataFrame(lista_analisis)
+        
+        # --- 3. FILTROS Y RANKINGS ---
+        st.subheader("🏆 Filtro de Oportunidades (Basado en RSI)")
+        c1, c2, c3 = st.columns(3)
+        
+        with c1:
+            mejores = df_rank.sort_values("rsi").head(3)
+            st.success("💎 TOP 3 COMPRA")
+            for _, r in mejores.iterrows():
+                st.write(f"**{r['ticker']}** (RSI: {r['rsi']:.1f})")
+        
+        with c2:
+            st.info(f"📊 Analizados: {len(lista_analisis)}/35")
+            st.write("Estado general del mercado.")
+
+        with c3:
+            peores = df_rank.sort_values("rsi", ascending=False).head(3)
+            st.error("⚠️ TOP 3 RIESGO")
+            for _, r in peores.iterrows():
+                st.write(f"**{r['ticker']}** (RSI: {r['rsi']:.1f})")
+
+        st.divider()
+
+        # --- 4. CUADRÍCULA DE LOS 35 (GRÁFICOS Y NOTICIAS) ---
+        st.subheader("📊 Análisis Individual y Noticias")
+        cols = st.columns(3)
+        for idx, item in enumerate(lista_analisis):
+            with cols[idx % 3]:
+                with st.expander(f"{item['emoji']} {item['ticker']}: {item['precio']:.2f}€"):
+                    st.write(f"**RSI:** {item['rsi']:.1f} | **Estado:** {item['estado']}")
+                    
+                    # Gráfico de Velas Interactivo
+                    fig = go.Figure(data=[go.Candlestick(
+                        x=item['df'].index,
+                        open=item['df']['Open'],
+                        high=item['df']['High'],
+                        low=item['df']['Low'],
+                        close=item['df']['Close']
+                    )])
+                    fig.update_layout(height=180, margin=dict(l=0,r=0,t=0,b=0), xaxis_rangeslider_visible=False)
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Enlace a Noticias
+                    n_limpio = item['ticker'].split('.')[0]
+                    st.markdown(f"[📰 Noticias de {n_limpio}](https://www.google.com/search?q={n_limpio}+noticias+bolsa&tbm=nws)")
 
 st.divider()
-st.write("⚠️ *Nota: El sistema de semáforos automáticos está temporalmente en pausa por el bloqueo de Yahoo Finance. Usa los botones de arriba para ver los datos oficiales.*")
+# --- CALCULADORA ---
+st.subheader("💰 Calculadora de Operación")
+inv = st.number_input("Inversión (€):", value=1000)
