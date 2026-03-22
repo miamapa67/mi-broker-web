@@ -1,44 +1,47 @@
 import streamlit as st
 import pandas as pd
-import yfinance as yf
-import requests
-
-# --- CONFIGURACIÓN DE CAMUFLAJE ---
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
-}
 
 st.set_page_config(page_title="Miguel Terminal", layout="wide")
 st.title("🏹 Terminal IBEX - MIGUEL")
 
-# Solo 2 valores para probar si hay "brecha"
-test_list = ["SAN.MC", "ITX.MC"]
+# Lista de acciones con sus códigos para Google Finance
+acciones = {
+    "Santander": "BME:SAN",
+    "BBVA": "BME:BBVA",
+    "Telefónica": "BME:TEF",
+    "Inditex": "BME:ITX",
+    "IAG": "BME:IAG"
+}
 
-if st.button('🚀 FORZAR CONEXIÓN DE EMERGENCIA'):
-    with st.spinner('Hackeando el acceso a los datos...'):
-        for t in test_list:
-            try:
-                # Usamos una sesión de requests para engañar al servidor
-                session = requests.Session()
-                session.headers.update(headers)
-                
-                ticker = yf.Ticker(t, session=session)
-                # Pedimos solo el último día para que no sospechen
-                df = ticker.history(period="1d")
-                
-                if not df.empty:
-                    precio = df['Close'].iloc[-1]
-                    st.success(f"✅ {t}: {precio:.2f}€ - ¡DATO RECUPERADO!")
-                else:
-                    st.error(f"❌ {t}: El servidor devolvió datos vacíos.")
-            except Exception as e:
-                st.error(f"❌ Error en {t}: Yahoo sigue bloqueando.")
+st.subheader("📊 Acceso Directo al Mercado")
+st.write("Debido a los bloqueos de Yahoo, he creado este panel de acceso rápido:")
+
+cols = st.columns(len(acciones))
+
+for i, (nombre, ticker) in enumerate(acciones.items()):
+    with cols[i]:
+        # Creamos un botón que te lleva directo al gráfico real
+        url = f"https://www.google.com/finance/quote/{ticker}"
+        st.markdown(f"### {nombre}")
+        st.link_button(f"👁️ Ver {nombre}", url, use_container_width=True)
 
 st.divider()
-st.warning("⚠️ Miguel, si esto sigue fallando con el error rosa, significa que Yahoo ha bloqueado la IP de Streamlit Cloud por hoy. No es culpa de tu código.")
 
-# --- PLAN B: ENLACES DIRECTOS ---
-st.subheader("🔗 Accesos Directos (Plan B)")
-st.write("Si el robot está bloqueado, usa estos enlaces para ver el mercado hoy:")
-st.markdown("- [📊 IBEX 35 en Google Finance](https://www.google.com/finance/quote/IBEX:INDEXBME)")
-st.markdown("- [📰 Noticias Bolsa Madrid](https://www.bolsamania.com/)")
+# --- CALCULADORA QUE SIEMPRE FUNCIONA ---
+st.subheader("💰 Calculadora de Ganancias Automática")
+col1, col2 = st.columns(2)
+
+with col1:
+    inversion = st.number_input("¿Cuánto dinero vas a meter? (€)", value=1000, step=100)
+    precio_compra = st.number_input("Precio actual de la acción (€)", value=10.0, step=0.1)
+    
+with col2:
+    objetivo = st.slider("Subida esperada (%)", 1, 50, 10)
+    ganancia = inversion * (objetivo / 100)
+    total = inversion + ganancia
+    
+    st.metric("Beneficio Estimado", f"+{ganancia:.2f}€", delta=f"{objetivo}%")
+    st.info(f"Si sube un {objetivo}%, retirarías un total de **{total:.2f}€**")
+
+st.divider()
+st.info("💡 Miguel, cuando Yahoo desbloquee la IP de Streamlit (suele tardar unas horas), podremos volver a ver los gráficos automáticos. Mientras tanto, usa esta terminal para calcular tus beneficios.")
