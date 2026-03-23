@@ -4,112 +4,94 @@ import yfinance as yf
 import plotly.graph_objects as go
 import time
 
-st.set_page_config(page_title="Miguel Terminal PRO", layout="wide")
-
-# Estilo profesional
+st.set_page_config(page_title="Miguel Terminal 360", layout="wide")
 st.markdown("<style>.stApp { background-color: #ffffff; }</style>", unsafe_allow_html=True)
 
 st.title("🏹 Terminal Inteligente IBEX 35 - MIGUEL")
 
-# --- 1. SECTORES CONFIGURADOS ---
-sectores = {
-    "🏦 BANCA": ["SAN.MC", "BBVA.MC", "CABK.MC", "SAB.MC", "BKT.MC", "UNI.MC"],
-    "⚡ ENERGÍA": ["IBE.MC", "REP.MC", "NTGY.MC", "ELE.MC", "ENG.MC", "REE.MC", "SLBA.MC"],
-    "🛍️ CONSUMO/IND": ["ITX.MC", "ANA.MC", "ACS.MC", "FER.MC", "ACX.MC", "MTS.MC", "IAG.MC"],
-    "📡 TECNOLOGÍA": ["TEF.MC", "CLNX.MC", "IDR.MC", "AMS.MC"],
-    "🧪 OTROS": ["GRF.MC", "ROVI.MC", "COL.MC", "MRL.MC", "AENA.MC"]
-}
+# --- 1. CALCULADORA RÁPIDA (SIEMPRE VISIBLE) ---
+with st.expander("💰 CALCULADORA DE OPERACIÓN RÁPIDA", expanded=True):
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        capital = st.number_input("Inversión (€):", value=1000, step=100)
+    with c2:
+        precio_entrada = st.number_input("Precio Acción (€):", value=10.0, step=0.1)
+    with c3:
+        objetivo = st.slider("Objetivo de subida (%)", 1, 30, 10)
+        ganancia = capital * (objetivo / 100)
+        st.metric("Beneficio Estimado", f"+{ganancia:.2f}€", f"{objetivo}%")
 
-# Sidebar: Filtros y Calculadora
-with st.sidebar:
-    st.header("⚙️ PANEL DE CONTROL")
-    sector_sel = st.selectbox("Elegir Sector para Analizar:", list(sectores.keys()))
-    st.divider()
-    st.header("💰 CALCULADORA")
-    capital = st.number_input("Inversión (€):", value=1000)
+st.divider()
 
-# --- 2. EL MOTOR DE ANÁLISIS ---
-if st.button(f"🚀 LANZAR ESCÁNER: {sector_sel}", use_container_width=True):
+# --- 2. LISTA 35 VALORES ---
+ibex_35 = [
+    "ANA.MC", "ACX.MC", "ACS.MC", "AENA.MC", "AMS.MC", "MTS.MC", "SAB.MC", "SAN.MC", "BKT.MC", "BBVA.MC",
+    "CABK.MC", "CLNX.MC", "ENG.MC", "ELE.MC", "FER.MC", "FDR.MC", "GRF.MC", "IAG.MC", "IBE.MC", "ITX.MC",
+    "IDR.MC", "COL.MC", "LOG.MC", "MAP.MC", "MEL.MC", "MRL.MC", "NTGY.MC", "PUIG.MC", "REE.MC", "REP.MC",
+    "ROVI.MC", "SCYR.MC", "SLBA.MC", "TEF.MC", "UNI.MC"
+]
+
+# --- 3. MOTOR DE ANÁLISIS ---
+if st.button('🚀 EJECUTAR ANÁLISIS 360 (RANKING Y SEMÁFOROS)', use_container_width=True):
     lista_analisis = []
     progreso = st.progress(0)
     status_msg = st.empty()
     
-    with st.spinner(f'Analizando {sector_sel}...'):
-        for i, t in enumerate(sectores[sector_sel]):
+    with st.spinner('Escaneando los 35 valores...'):
+        for i, t in enumerate(ibex_35):
             try:
-                status_msg.text(f"Analizando {t}...")
-                tk = yf.Ticker(t)
-                df = tk.history(period="1mo")
+                status_msg.text(f"Analizando {t}... ({i+1}/35)")
+                df = yf.download(t, period="1mo", interval="1d", progress=False, timeout=10)
                 
-                if not df.empty:
+                if not df.empty and len(df) > 10:
                     p_act = float(df['Close'].iloc[-1])
-                    # Cálculo RSI (Semáforo)
+                    # RSI para el Semáforo
                     delta = df['Close'].diff()
                     up = delta.clip(lower=0).rolling(window=14).mean()
                     down = -1 * delta.clip(upper=0).rolling(window=14).mean()
-                    rs = up / (down + 0.00001)
-                    rsi = 100 - (100 / (1 + rs.iloc[-1]))
+                    rsi = 100 - (100 / (1 + (up.iloc[-1] / (down.iloc[-1] + 0.0001))))
                     
-                    # Semáforo de colores
-                    if rsi < 40: sem, col, est = "🟢", "green", "COMPRA"
-                    elif rsi > 60: sem, col, est = "🔴", "red", "RIESGO"
-                    else: sem, col, est = "⚪", "gray", "NEUTRO"
+                    sem = "🟢" if rsi < 40 else "🔴" if rsi > 60 else "⚪"
                     
                     lista_analisis.append({
-                        "ticker": t, "precio": p_act, "rsi": rsi, 
-                        "emoji": sem, "color": col, "estado": est, "df": df
+                        "ticker": t, "precio": p_act, "rsi": rsi, "emoji": sem, "df": df
                     })
-                
-                time.sleep(0.2)
-                progreso.progress((i + 1) / len(sectores[sector_sel]))
+                time.sleep(0.1)
+                progreso.progress((i + 1) / len(ibex_35))
             except:
                 continue
-    
     status_msg.empty()
 
     if lista_analisis:
         df_rank = pd.DataFrame(lista_analisis)
         
-        # --- 3. RANKING DE OPORTUNIDADES (TOP 3) ---
-        st.subheader(f"🏆 Ranking de Selección: {sector_sel}")
-        c1, c2 = st.columns(2)
-        
-        with c1:
+        # --- TOP 3 DE MIGUEL ---
+        st.subheader("🏆 Selección Inteligente de Hoy")
+        col_m, col_p = st.columns(2)
+        with col_m:
             mejores = df_rank.sort_values("rsi").head(3)
-            st.markdown("### 💎 TOP 3: MEJOR COMPRA")
+            st.success("💎 TOP 3 COMPRA (RSI Bajo)")
             for _, r in mejores.iterrows():
-                st.info(f"{r['emoji']} **{r['ticker']}** - {r['precio']:.2f}€ (RSI: {r['rsi']:.1f})")
-        
-        with c2:
+                st.write(f"{r['emoji']} **{r['ticker']}**: {r['precio']:.2f}€")
+        with col_p:
             peores = df_rank.sort_values("rsi", ascending=False).head(3)
-            st.markdown("### ⚠️ TOP 3: MAYOR RIESGO")
+            st.error("⚠️ TOP 3 RIESGO (RSI Alto)")
             for _, r in peores.iterrows():
-                st.error(f"{r['emoji']} **{r['ticker']}** - {r['precio']:.2f}€ (RSI: {r['rsi']:.1f})")
+                st.write(f"{r['emoji']} **{r['ticker']}**: {r['precio']:.2f}€")
 
         st.divider()
-
-        # --- 4. DETALLE INDIVIDUAL CON GRÁFICOS Y NOTICIAS ---
-        st.subheader("📊 Análisis Detallado y Noticias")
+        
+        # --- DETALLE INDIVIDUAL ---
+        st.subheader("📊 Radiografía de los 35")
         cols = st.columns(3)
         for idx, item in enumerate(lista_analisis):
             with cols[idx % 3]:
-                # Tarjeta visual
-                with st.container(border=True):
-                    st.markdown(f"#### {item['emoji']} {item['ticker']}")
-                    st.write(f"**Precio:** {item['precio']:.2f}€")
-                    st.write(f"**Estado:** {item['estado']} (RSI: {item['rsi']:.1f})")
-                    
-                    # Gráfico mini
-                    fig = go.Figure(data=[go.Scatter(x=item['df'].index[-15:], y=item['df']['Close'][-15:], mode='lines+markers', line=dict(color=item['color']))])
+                with st.expander(f"{item['emoji']} {item['ticker']} - {item['precio']:.2f}€"):
+                    st.write(f"RSI: {item['rsi']:.1f}")
+                    fig = go.Figure(data=[go.Scatter(x=item['df'].index[-15:], y=item['df']['Close'][-15:], mode='lines')])
                     fig.update_layout(height=140, margin=dict(l=0,r=0,t=0,b=0), xaxis_visible=False)
                     st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Botón de Noticias Individual
-                    nombre_corto = item['ticker'].split('.')[0]
-                    st.link_button(f"📰 Noticias de {nombre_corto}", f"https://www.google.com/search?q={nombre_corto}+noticias+bolsa&tbm=nws", use_container_width=True)
+                    n_limpio = item['ticker'].split('.')[0]
+                    st.markdown(f"[📰 Noticias {n_limpio}](https://www.google.com/search?q={n_limpio}+noticias+bolsa&tbm=nws)")
     else:
-        st.error("Error al recuperar datos. Pulsa de nuevo.")
-
-st.divider()
-st.subheader("💰 Calculadora Rápida")
-inv = st.number_input("Inversión (€):", value=1000)
+        st.error("⚠️ Error de conexión. Intenta de nuevo en unos segundos.")
