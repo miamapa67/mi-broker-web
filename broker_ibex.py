@@ -26,42 +26,44 @@ tickers_finales = []
 for s in sector_sel:
     tickers_finales.extend(sectores[s])
 
-# --- 2. MOTOR DE ANÁLISIS CON BYPASS ---
+# --- 2. MOTOR DE ANÁLISIS CAMUFLADO ---
 if st.button('🚀 LANZAR ESCÁNER 360 (RANKING Y SEMÁFOROS)', use_container_width=True):
     lista_analisis = []
     progreso = st.progress(0)
     status_msg = st.empty()
     
-    # DISFRAZ PARA EL SERVIDOR
+    # DISFRAZ PARA EL SERVIDOR (Session)
     sesion = requests.Session()
-    sesion.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36'})
+    sesion.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/110.0.0.0 Safari/537.36'})
 
-    with st.spinner('Escaneando el mercado...'):
+    with st.spinner('Evitando bloqueos de servidor...'):
         for i, t in enumerate(tickers_finales):
             try:
                 status_msg.text(f"Analizando {t}... ({i+1}/{len(tickers_finales)})")
                 
-                # Descarga protegida
+                # Descarga rápida con timeout corto
                 tk = yf.Ticker(t, session=sesion)
-                df = tk.history(period="1mo", timeout=10)
+                df = tk.history(period="1mo", timeout=5)
                 
                 if not df.empty and len(df) > 10:
                     p_act = float(df['Close'].iloc[-1])
                     
-                    # Cálculo RSI Limpio
+                    # Cálculo RSI Limpio (Evitamos el error Futurewarning)
                     delta = df['Close'].diff()
-                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                    rs = gain.iloc[-1] / (loss.iloc[-1] + 0.00001)
-                    rsi = 100 - (100 / (1 + rs))
+                    up = delta.clip(lower=0)
+                    down = -1 * delta.clip(upper=0)
+                    ema_up = up.rolling(window=14).mean()
+                    ema_down = down.rolling(window=14).mean()
+                    rs = ema_up / (ema_down + 0.00001)
+                    rsi = 100 - (100 / (1 + rs.iloc[-1]))
                     
                     sem = "🟢" if rsi < 40 else "🔴" if rsi > 60 else "⚪"
                     
                     lista_analisis.append({
-                        "ticker": t, "precio": p_act, "rsi": rsi, "emoji": sem, "df": df
+                        "ticker": t, "precio": p_act, "rsi": float(rsi), "emoji": sem, "df": df
                     })
                 
-                time.sleep(0.1) # Pausa estratégica
+                time.sleep(0.1) 
                 progreso.progress((i + 1) / len(tickers_finales))
             except:
                 continue
@@ -71,35 +73,35 @@ if st.button('🚀 LANZAR ESCÁNER 360 (RANKING Y SEMÁFOROS)', use_container_wi
     if lista_analisis:
         df_rank = pd.DataFrame(lista_analisis)
         
-        # --- 3. EL RANKING TOP 3 ---
-        st.subheader("🏆 Oportunidades de Compra y Alertas")
+        # --- 3. RANKING TOP 3 (COMPRAS Y RIESGOS) ---
+        st.subheader("🏆 Selección Inteligente de Hoy")
         c1, c2 = st.columns(2)
         with c1:
             mejores = df_rank.sort_values("rsi").head(3)
-            st.success("💎 TOP 3 COMPRA (RSI Bajo)")
+            st.success("💎 TOP 3 COMPRA (Oportunidad)")
             for _, r in mejores.iterrows():
-                st.write(f"{r['emoji']} **{r['ticker']}**: {r['precio']:.2f}€")
+                st.write(f"{r['emoji']} **{r['ticker']}**: {r['precio']:.2f}€ (RSI: {r['rsi']:.1f})")
         with c2:
             peores = df_rank.sort_values("rsi", ascending=False).head(3)
-            st.error("⚠️ TOP 3 RIESGO (RSI Alto)")
+            st.error("⚠️ TOP 3 RIESGO (Sobrecompra)")
             for _, r in peores.iterrows():
-                st.write(f"{r['emoji']} **{r['ticker']}**: {r['precio']:.2f}€")
+                st.write(f"{r['emoji']} **{r['ticker']}**: {r['precio']:.2f}€ (RSI: {r['rsi']:.1f})")
 
         st.divider()
 
-        # --- 4. RADIOGRAFÍA INDIVIDUAL ---
+        # --- 4. RADIOGRAFÍA DETALLADA ---
         cols = st.columns(3)
         for idx, item in enumerate(lista_analisis):
             with cols[idx % 3]:
-                with st.expander(f"{item['emoji']} {item['ticker']} - {item['precio']:.2f}€", expanded=True):
-                    st.write(f"RSI: {item['rsi']:.1f}")
+                with st.expander(f"{item['emoji']} {item['ticker']} - {item['precio']:.2f}€"):
+                    st.write(f"Fuerza RSI: {item['rsi']:.1f}")
                     fig = go.Figure(data=[go.Scatter(x=item['df'].index[-15:], y=item['df']['Close'][-15:], mode='lines+markers')])
                     fig.update_layout(height=140, margin=dict(l=0,r=0,t=0,b=0), xaxis_visible=False)
                     st.plotly_chart(fig, use_container_width=True)
                     st.markdown(f"[📰 Noticias](https://www.google.com/search?q={item['ticker'].split('.')[0]}+noticias+bolsa&tbm=nws)")
     else:
-        st.error("❌ Yahoo ha bloqueado la conexión. Por favor, intenta de nuevo en unos minutos o desde tu móvil con datos.")
+        st.error("⚠️ El bloqueo persiste. Prueba a abrir la app desde tu MÓVIL con el WiFi quitado (usa datos 4G/5G).")
 
 st.divider()
-st.subheader("💰 Calculadora Rápida")
-inv = st.number_input("Inversión (€):", value=1000)
+st.subheader("💰 Calculadora")
+inv = st.number_input("Dinero a invertir (€):", value=1000)
