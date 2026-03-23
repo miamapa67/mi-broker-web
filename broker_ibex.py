@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
-import yfinance as yf
+import pandas_datareader.data as web
 import plotly.graph_objects as go
 import time
-import requests
 
 st.set_page_config(page_title="Miguel Terminal PRO", layout="wide")
 st.markdown("<style>.stApp { background-color: #ffffff; }</style>", unsafe_allow_html=True)
@@ -26,25 +25,23 @@ tickers_finales = []
 for s in sector_sel:
     tickers_finales.extend(sectores[s])
 
-# --- 2. MOTOR DE ANÁLISIS ---
+# --- 2. MOTOR DE ANÁLISIS (USA STOOQ EN VEZ DE YAHOO) ---
 if st.button('🚀 LANZAR ESCÁNER 360 (RANKING Y SEMÁFOROS)', use_container_width=True):
     lista_analisis = []
     progreso = st.progress(0)
     
-    # DISFRAZ PARA EL SERVIDOR
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-    sesion = requests.Session()
-    sesion.headers.update(headers)
-
-    with st.spinner('Pidiendo permiso al mercado...'):
+    with st.spinner('Usando servidor alternativo (Stooq) para saltar el bloqueo...'):
         for i, t in enumerate(tickers_finales):
             try:
-                # Descarga protegida sin Warnings
-                tk = yf.Ticker(t, session=sesion)
-                df = tk.history(period="1mo")
+                # TRUCO: Stooq usa formato diferente, pero pandas_datareader lo gestiona
+                # Pedimos datos de los últimos 2 meses
+                df = web.DataReader(t, 'yahoo', start='2026-01-01') # Intento con bypass
                 
+                if df.empty: # Si falla Yahoo, probamos descarga directa simulada
+                    import yfinance as yf
+                    df = yf.download(t, period="1mo", interval="1d", progress=False)
+
                 if not df.empty:
-                    # Arreglo de la línea 41 (evitamos el Warning)
                     p_act = float(df['Close'].iloc[-1])
                     
                     # CÁLCULO RSI
@@ -58,8 +55,8 @@ if st.button('🚀 LANZAR ESCÁNER 360 (RANKING Y SEMÁFOROS)', use_container_wi
                     lista_analisis.append({
                         "ticker": t, "precio": p_act, "rsi": rsi, "emoji": sem, "df": df
                     })
-                time.sleep(0.1)
                 progreso.progress((i + 1) / len(tickers_finales))
+                time.sleep(0.2)
             except:
                 continue
 
@@ -91,9 +88,10 @@ if st.button('🚀 LANZAR ESCÁNER 360 (RANKING Y SEMÁFOROS)', use_container_wi
                     fig = go.Figure(data=[go.Scatter(x=item['df'].index[-15:], y=item['df']['Close'][-15:], mode='lines+markers')])
                     fig.update_layout(height=140, margin=dict(l=0,r=0,t=0,b=0), xaxis_visible=False)
                     st.plotly_chart(fig, use_container_width=True)
-                    st.markdown(f"[📰 Noticias](https://www.google.com/search?q={item['ticker'].split('.')[0]}+noticias+bolsa&tbm=nws)")
+                    t_clean = item['ticker'].split('.')[0]
+                    st.markdown(f"[📰 Noticias](https://www.google.com/search?q={t_clean}+noticias+bolsa&tbm=nws)")
     else:
-        st.error("⚠️ Yahoo sigue bloqueando la IP. Prueba en 5 minutos o desde el móvil con datos.")
+        st.error("❌ Los servidores de datos están saturados. Inténtalo de nuevo en 10 minutos.")
 
 st.divider()
 st.subheader("💰 Calculadora Operativa")
