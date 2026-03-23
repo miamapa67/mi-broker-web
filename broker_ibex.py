@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import pandas_datareader.data as web
+import yfinance as yf
 import plotly.graph_objects as go
 import time
 
@@ -25,26 +25,21 @@ tickers_finales = []
 for s in sector_sel:
     tickers_finales.extend(sectores[s])
 
-# --- 2. MOTOR DE ANÁLISIS (USA STOOQ EN VEZ DE YAHOO) ---
+# --- 2. MOTOR DE ANÁLISIS ---
 if st.button('🚀 LANZAR ESCÁNER 360 (RANKING Y SEMÁFOROS)', use_container_width=True):
     lista_analisis = []
     progreso = st.progress(0)
     
-    with st.spinner('Usando servidor alternativo (Stooq) para saltar el bloqueo...'):
+    with st.spinner('Analizando el IBEX... Esto puede tardar 20 segundos para evitar bloqueos.'):
         for i, t in enumerate(tickers_finales):
             try:
-                # TRUCO: Stooq usa formato diferente, pero pandas_datareader lo gestiona
-                # Pedimos datos de los últimos 2 meses
-                df = web.DataReader(t, 'yahoo', start='2026-01-01') # Intento con bypass
+                # Descarga individual lenta para no ser baneados
+                df = yf.download(t, period="1mo", interval="1d", progress=False)
                 
-                if df.empty: # Si falla Yahoo, probamos descarga directa simulada
-                    import yfinance as yf
-                    df = yf.download(t, period="1mo", interval="1d", progress=False)
-
-                if not df.empty:
+                if not df.empty and len(df) > 10:
                     p_act = float(df['Close'].iloc[-1])
                     
-                    # CÁLCULO RSI
+                    # Cálculo RSI (Semáforo)
                     delta = df['Close'].diff()
                     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
@@ -55,8 +50,9 @@ if st.button('🚀 LANZAR ESCÁNER 360 (RANKING Y SEMÁFOROS)', use_container_wi
                     lista_analisis.append({
                         "ticker": t, "precio": p_act, "rsi": rsi, "emoji": sem, "df": df
                     })
+                
+                time.sleep(0.3) # PAUSA CRÍTICA ANTI-BLOQUEO
                 progreso.progress((i + 1) / len(tickers_finales))
-                time.sleep(0.2)
             except:
                 continue
 
@@ -79,7 +75,7 @@ if st.button('🚀 LANZAR ESCÁNER 360 (RANKING Y SEMÁFOROS)', use_container_wi
 
         st.divider()
 
-        # --- 4. CUADRÍCULA DETALLADA ---
+        # --- 4. RADIOGRAFÍA INDIVIDUAL ---
         cols = st.columns(3)
         for idx, item in enumerate(lista_analisis):
             with cols[idx % 3]:
@@ -91,8 +87,8 @@ if st.button('🚀 LANZAR ESCÁNER 360 (RANKING Y SEMÁFOROS)', use_container_wi
                     t_clean = item['ticker'].split('.')[0]
                     st.markdown(f"[📰 Noticias](https://www.google.com/search?q={t_clean}+noticias+bolsa&tbm=nws)")
     else:
-        st.error("❌ Los servidores de datos están saturados. Inténtalo de nuevo en 10 minutos.")
+        st.error("❌ Yahoo sigue bloqueando la IP. Por favor, intenta de nuevo en unos minutos.")
 
 st.divider()
-st.subheader("💰 Calculadora Operativa")
+st.subheader("💰 Calculadora")
 inv = st.number_input("Inversión (€):", value=1000)
