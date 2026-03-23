@@ -3,19 +3,13 @@ import pandas as pd
 import yfinance as yf
 import plotly.graph_objects as go
 import time
-import random
 
-# Configuración de página ancha y profesional
-st.set_page_config(page_title="Miguel Terminal 360 Pro", layout="wide")
-
-# Estilo Blanco Nítido
+st.set_page_config(page_title="Miguel Terminal PRO", layout="wide")
 st.markdown("<style>.stApp { background-color: #ffffff; }</style>", unsafe_allow_html=True)
 
-# --- 1. CABECERA ---
 st.title("🏹 Terminal Inteligente IBEX 35 - MIGUEL")
-st.write("Análisis de Oportunidades, Semáforos RSI, Gráficos Interactivos de Línea y Noticias.")
 
-# --- 2. DICCIONARIO OFICIAL POR SECTORES ---
+# --- 1. ESTRUCTURA DE SECTORES ---
 sectores = {
     "Banca": ["SAN.MC", "BBVA.MC", "CABK.MC", "SAB.MC", "BKT.MC", "UNI.MC"],
     "Energía": ["IBE.MC", "REP.MC", "NTGY.MC", "ELE.MC", "ENG.MC", "REE.MC", "SLBA.MC"],
@@ -24,118 +18,81 @@ sectores = {
     "Otros": ["GRF.MC", "ROVI.MC", "COL.MC", "MRL.MC", "LOG.MC", "AENA.MC", "SCYR.MC", "FDR.MC", "MEL.MC"]
 }
 
-# --- 3. FILTROS LATERALES (SIDEBAR) ---
-st.sidebar.header("🎯 Filtros de Mercado")
-sector_sel = st.sidebar.multiselect("Seleccionar Sectores:", list(sectores.keys()), default=list(sectores.keys()))
+# Filtros en el lateral
+st.sidebar.header("🎯 Filtros de Selección")
+sector_sel = st.sidebar.multiselect("Filtrar Sectores:", list(sectores.keys()), default=list(sectores.keys()))
 
-# Crear lista plana de tickers seleccionados basándonos en los sectores
 tickers_finales = []
 for s in sector_sel:
     tickers_finales.extend(sectores[s])
 
-# --- 4. BOTÓN DE ESCÁNER TOTAL ---
-if st.button('🚀 EJECUTAR ANÁLISIS 360 (SEMÁFOROS Y RANKING)', use_container_width=True):
+# --- 2. MOTOR DE ANÁLISIS ---
+if st.button('🚀 LANZAR ESCÁNER 360 (RANKING Y SEMÁFOROS)', use_container_width=True):
     lista_analisis = []
     progreso = st.progress(0)
-    status_text = st.empty()
     
-    with st.spinner('Analizando el IBEX 35 con gráficos interactivos...'):
-        # TRUCO DE CAMUFLAJE: Pequeñas pausas para evitar bloqueos de Yahoo
+    with st.spinner('Analizando el mercado...'):
         for i, t in enumerate(tickers_finales):
             try:
-                status_text.text(f"Analizando {t}... ({i+1}/{len(tickers_finales)})")
-                # Descarga protegida: solo 1 mes para que sea ultra-rápido
-                df = yf.download(t, period="1mo", interval="1d", progress=False, timeout=8)
+                # Descarga protegida
+                df = yf.download(t, period="1mo", interval="1d", progress=False, timeout=10)
                 
                 if not df.empty and len(df) > 10:
                     p_act = float(df['Close'].iloc[-1])
                     
-                    # --- CÁLCULO RSI (EL MOTOR DEL SEMÁFORO) ---
+                    # Cálculo RSI (Semáforo)
                     delta = df['Close'].diff()
                     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
                     rsi = 100 - (100 / (1 + (gain.iloc[-1] / (loss.iloc[-1] + 0.001))))
                     
-                    # Clasificación para Filtros
-                    if rsi < 35: sem, est = "🟢", "COMPRA"
-                    elif rsi > 65: sem, est = "🔴", "RIESGO"
-                    else: sem, est = "⚪", "NEUTRO"
+                    sem = "🟢" if rsi < 40 else "🔴" if rsi > 60 else "⚪"
+                    est = "COMPRA" if rsi < 40 else "RIESGO" if rsi > 60 else "NEUTRO"
                     
                     lista_analisis.append({
-                        "ticker": t, "precio": p_act, "rsi": rsi, 
-                        "emoji": sem, "estado": est, "df": df
+                        "ticker": t, "precio": p_act, "rsi": rsi, "emoji": sem, "estado": est, "df": df
                     })
-                
-                # Pausa técnica aleatoria para no parecer un robot pesado
-                time.sleep(random.uniform(0.1, 0.2))
+                time.sleep(0.1)
                 progreso.progress((i + 1) / len(tickers_finales))
             except:
                 continue
 
-    status_text.empty()
-
     if lista_analisis:
         df_rank = pd.DataFrame(lista_analisis)
         
-        # --- 5. FILTROS Y RANKINGS (TOP 3) ---
-        st.subheader("🏆 Filtro de Oportunidades y Riesgos")
-        c_top1, c_top2 = st.columns(2)
-        
-        with c_top1:
+        # --- 3. TOP 3: LA INTELIGENCIA DE LA APP ---
+        st.subheader("🏆 Oportunidades y Alertas de Hoy")
+        c1, c2 = st.columns(2)
+        with c1:
             mejores = df_rank.sort_values("rsi").head(3)
-            st.success("💎 TOP 3 COMPRA (RSI Bajo)")
+            st.success("💎 TOP 3 COMPRA (RSI BAJO)")
             for _, r in mejores.iterrows():
-                st.write(f"{r['emoji']} **{r['ticker']}** - Precio: {r['precio']:.2f}€ (RSI: {r['rsi']:.1f})")
-        
-        with c_top2:
+                st.write(f"{r['emoji']} **{r['ticker']}** - {r['precio']:.2f}€")
+        with c2:
             peores = df_rank.sort_values("rsi", ascending=False).head(3)
-            st.error("⚠️ TOP 3 RIESGO (RSI Alto)")
+            st.error("⚠️ TOP 3 RIESGO (RSI ALTO)")
             for _, r in peores.iterrows():
-                st.write(f"{r['emoji']} **{r['ticker']}** - Precio: {r['precio']:.2f}€ (RSI: {r['rsi']:.1f})")
+                st.write(f"{r['emoji']} **{r['ticker']}** - {r['precio']:.2f}€")
 
         st.divider()
 
-        # --- 6. CUADRÍCULA DE VALORES CON GRÁFICOS INTERACTIVOS ---
-        st.subheader("📊 Análisis Individual y Noticias")
+        # --- 4. CUADRÍCULA DE LOS 35 ---
+        st.subheader("📊 Análisis Individual")
         cols = st.columns(3)
         for idx, item in enumerate(lista_analisis):
             with cols[idx % 3]:
-                with st.expander(f"{item['emoji']} {item['ticker']}: {item['precio']:.2f}€"):
-                    st.write(f"**RSI:** {item['rsi']:.1f} | **Estado:** {item['estado']}")
-                    
-                    # --- GRÁFICO INTERACTIVO DE LÍNEA Ultraligero ---
-                    # Mostramos los últimos 30 días
-                    fig = go.Figure(data=[go.Scatter(
-                        x=item['df'].index, 
-                        y=item['df']['Close'], 
-                        mode='lines', # Solo línea para velocidad
-                        line=dict(color='#1f77b4', width=2),
-                        name='Precio'
-                    )])
-                    
-                    # Diseño limpio para que quepa bien en las tarjetas
-                    fig.update_layout(
-                        height=150, 
-                        margin=dict(l=0, r=0, t=0, b=0), 
-                        xaxis_visible=False, # Ocultamos fechas para limpiar
-                        yaxis=dict(title="€", side="right"),
-                        hovermode="x unified" # Muestra precio al pasar ratón
-                    )
+                with st.expander(f"{item['emoji']} {item['ticker']} - {item['precio']:.2f}€"):
+                    st.write(f"RSI: {item['rsi']:.1f} | Estado: {item['estado']}")
+                    # Gráfico mini
+                    fig = go.Figure(data=[go.Candlestick(x=item['df'].index[-15:], open=item['df']['Open'][-15:], high=item['df']['High'][-15:], low=item['df']['Low'][-15:], close=item['df']['Close'][-15:])])
+                    fig.update_layout(height=160, margin=dict(l=0,r=0,t=0,b=0), xaxis_rangeslider_visible=False)
                     st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Radar de Noticias e Info
-                    n_limpio = item['ticker'].split('.')[0]
-                    col_info1, col_info2 = st.columns(2)
-                    with col_info1:
-                        st.markdown(f"[📰 Noticias {n_limpio}](https://www.google.com/search?q={n_limpio}+noticias+bolsa&tbm=nws)")
-                    with col_info2:
-                        st.markdown(f"[📊 Google Finance](https://www.google.com/finance/quote/{item['ticker'].replace('.MC', ':BME')})")
-
+                    # Noticias
+                    name = item['ticker'].split('.')[0]
+                    st.markdown(f"[📰 Noticias {name}](https://www.google.com/search?q={name}+noticias+bolsa&tbm=nws)")
     else:
-        st.error("⚠️ Yahoo sigue bloqueando la IP de Streamlit Cloud por hoy.")
-        st.info("💡 Miguel: Intenta abrir la app desde tu MÓVIL (con datos 4G/5G, desconectando el WiFi de casa). Si desde el móvil funciona, el problema es el WiFi de tu casa que Yahoo ha bloqueado temporalmente.")
+        st.warning("⚠️ No se han podido recuperar datos. Intenta pulsar de nuevo en unos segundos.")
 
 st.divider()
-# --- 7. CALCULADORA DE OPERACIÓN ---
-st.subheader("💰 Calculadora de Operación Rápida")
-inv = st.number_input("Inversión (€):", value=1000, step=500)
+st.subheader("💰 Calculadora Operativa")
+inv = st.number_input("Inversión (€):", value=1000)
