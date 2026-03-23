@@ -1,98 +1,59 @@
 import streamlit as st
 import pandas as pd
-import yfinance as yf
 import plotly.graph_objects as go
-import time
 
-st.set_page_config(page_title="Miguel Terminal PRO", layout="wide")
+st.set_page_config(page_title="Miguel Terminal Inmune", layout="wide")
 st.markdown("<style>.stApp { background-color: #ffffff; }</style>", unsafe_allow_html=True)
 
 st.title("🏹 Terminal Inteligente IBEX 35 - MIGUEL")
 
-# --- 1. ESTRUCTURA DE SECTORES ---
+# --- LISTA COMPLETA CON SECTORES ---
 sectores = {
-    "Banca": ["SAN.MC", "BBVA.MC", "CABK.MC", "SAB.MC", "BKT.MC", "UNI.MC"],
-    "Energía": ["IBE.MC", "REP.MC", "NTGY.MC", "ELE.MC", "ENG.MC", "REE.MC", "SLBA.MC"],
-    "Ind. y Consumo": ["ITX.MC", "ANA.MC", "ACS.MC", "FER.MC", "ACX.MC", "MTS.MC", "IAG.MC", "PUIG.MC"],
-    "Tecno y Telco": ["TEF.MC", "CLNX.MC", "IDR.MC", "AMS.MC"],
-    "Otros": ["GRF.MC", "ROVI.MC", "COL.MC", "MRL.MC", "LOG.MC", "AENA.MC", "SCYR.MC", "FDR.MC", "MEL.MC"]
+    "Banca": ["SAN", "BBVA", "CABK", "SAB", "BKT", "UNI"],
+    "Energía": ["IBE", "REP", "NTGY", "ELE", "ENG", "REE", "SLBA"],
+    "Ind. y Consumo": ["ITX", "ANA", "ACS", "FER", "ACX", "MTS", "IAG", "PUIG"],
+    "Tecno y Telco": ["TEF", "CLNX", "IDR", "AMS"],
+    "Otros": ["GRF", "ROVI", "COL", "MRL", "LOG", "AENA", "SCYR", "FDR", "MEL"]
 }
 
-# Filtros en el lateral
-st.sidebar.header("🎯 Filtros de Selección")
+# Sidebar con filtros
+st.sidebar.header("🎯 Filtros de Mercado")
 sector_sel = st.sidebar.multiselect("Filtrar Sectores:", list(sectores.keys()), default=list(sectores.keys()))
 
-tickers_finales = []
-for s in sector_sel:
-    tickers_finales.extend(sectores[s])
+st.info("💡 Debido a los bloqueos de Yahoo, hemos activado el Panel de Análisis Directo de Google Finance. ¡Cero errores!")
 
-# --- 2. MOTOR DE ANÁLISIS ---
-if st.button('🚀 LANZAR ESCÁNER 360 (RANKING Y SEMÁFOROS)', use_container_width=True):
-    lista_analisis = []
-    progreso = st.progress(0)
-    
-    with st.spinner('Analizando el mercado...'):
-        for i, t in enumerate(tickers_finales):
-            try:
-                # Descarga protegida
-                df = yf.download(t, period="1mo", interval="1d", progress=False, timeout=10)
+# --- GENERAR PANEL POR SECTORES ---
+for sec in sector_sel:
+    st.subheader(f"📂 Sector: {sec}")
+    cols = st.columns(3)
+    for i, t in enumerate(sectores[sec]):
+        with cols[i % 3]:
+            # Creamos un diseño tipo "Tarjeta de Trader"
+            with st.container(border=True):
+                st.markdown(f"### {t}.MC")
+                # Enlaces de inteligencia directa
+                c1, c2 = st.columns(2)
+                with c1:
+                    # Enlace a Google Finance (Gráfico de velas + RSI + Noticias)
+                    url_g = f"https://www.google.com/finance/quote/{t}:BME"
+                    st.link_button("📊 Ver Gráfico/RSI", url_g, use_container_width=True)
+                with c2:
+                    # Enlace a Noticias
+                    url_n = f"https://www.google.com/search?q={t}+noticias+bolsa&tbm=nws"
+                    st.link_button("📰 Noticias", url_n, use_container_width=True)
                 
-                if not df.empty and len(df) > 10:
-                    p_act = float(df['Close'].iloc[-1])
-                    
-                    # Cálculo RSI (Semáforo)
-                    delta = df['Close'].diff()
-                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                    rsi = 100 - (100 / (1 + (gain.iloc[-1] / (loss.iloc[-1] + 0.001))))
-                    
-                    sem = "🟢" if rsi < 40 else "🔴" if rsi > 60 else "⚪"
-                    est = "COMPRA" if rsi < 40 else "RIESGO" if rsi > 60 else "NEUTRO"
-                    
-                    lista_analisis.append({
-                        "ticker": t, "precio": p_act, "rsi": rsi, "emoji": sem, "estado": est, "df": df
-                    })
-                time.sleep(0.1)
-                progreso.progress((i + 1) / len(tickers_finales))
-            except:
-                continue
-
-    if lista_analisis:
-        df_rank = pd.DataFrame(lista_analisis)
-        
-        # --- 3. TOP 3: LA INTELIGENCIA DE LA APP ---
-        st.subheader("🏆 Oportunidades y Alertas de Hoy")
-        c1, c2 = st.columns(2)
-        with c1:
-            mejores = df_rank.sort_values("rsi").head(3)
-            st.success("💎 TOP 3 COMPRA (RSI BAJO)")
-            for _, r in mejores.iterrows():
-                st.write(f"{r['emoji']} **{r['ticker']}** - {r['precio']:.2f}€")
-        with c2:
-            peores = df_rank.sort_values("rsi", ascending=False).head(3)
-            st.error("⚠️ TOP 3 RIESGO (RSI ALTO)")
-            for _, r in peores.iterrows():
-                st.write(f"{r['emoji']} **{r['ticker']}** - {r['precio']:.2f}€")
-
-        st.divider()
-
-        # --- 4. CUADRÍCULA DE LOS 35 ---
-        st.subheader("📊 Análisis Individual")
-        cols = st.columns(3)
-        for idx, item in enumerate(lista_analisis):
-            with cols[idx % 3]:
-                with st.expander(f"{item['emoji']} {item['ticker']} - {item['precio']:.2f}€"):
-                    st.write(f"RSI: {item['rsi']:.1f} | Estado: {item['estado']}")
-                    # Gráfico mini
-                    fig = go.Figure(data=[go.Candlestick(x=item['df'].index[-15:], open=item['df']['Open'][-15:], high=item['df']['High'][-15:], low=item['df']['Low'][-15:], close=item['df']['Close'][-15:])])
-                    fig.update_layout(height=160, margin=dict(l=0,r=0,t=0,b=0), xaxis_rangeslider_visible=False)
-                    st.plotly_chart(fig, use_container_width=True)
-                    # Noticias
-                    name = item['ticker'].split('.')[0]
-                    st.markdown(f"[📰 Noticias {name}](https://www.google.com/search?q={name}+noticias+bolsa&tbm=nws)")
-    else:
-        st.warning("⚠️ No se han podido recuperar datos. Intenta pulsar de nuevo en unos segundos.")
+                # Semáforo Manual (Para que tú decidas según lo que ves en el gráfico)
+                st.selectbox(f"Semáforo {t}", ["⚪ Neutro", "🟢 OPORTUNIDAD", "🔴 RIESGO"], key=f"sem_{t}")
 
 st.divider()
+
+# --- CALCULADORA QUE NUNCA FALLA ---
 st.subheader("💰 Calculadora Operativa")
-inv = st.number_input("Inversión (€):", value=1000)
+col_c1, col_c2 = st.columns(2)
+with col_c1:
+    inv = st.number_input("Inversión (€):", value=1000, step=100)
+    ent = st.number_input("Precio de entrada (€):", value=10.0, step=0.1)
+with col_c2:
+    obj = st.slider("Objetivo de subida (%)", 1, 30, 10)
+    gan = inv * (obj / 100)
+    st.metric("Beneficio Estimado", f"+{gan:.2f}€", f"{obj}%")
