@@ -4,7 +4,7 @@ import yfinance as yf
 import plotly.graph_objects as go
 import time
 
-st.set_page_config(page_title="Miguel Terminal Interactiva", layout="wide")
+st.set_page_config(page_title="Miguel Terminal PRO", layout="wide")
 st.markdown("<style>.stApp { background-color: #ffffff; }</style>", unsafe_allow_html=True)
 
 st.title("🏹 Terminal Inteligente IBEX 35: Análisis 360°")
@@ -23,7 +23,7 @@ if st.button('🚀 EJECUTAR ESCÁNER INTERACTIVO 35 VALORES', use_container_widt
     progreso = st.progress(0)
     status = st.empty()
     
-    with st.spinner('Procesando gráficos y datos técnicos...'):
+    with st.spinner('Analizando los 35 valores y noticias de última hora...'):
         for i, t in enumerate(ibex_35):
             try:
                 status.text(f"Analizando {t}...")
@@ -60,53 +60,50 @@ if st.button('🚀 EJECUTAR ESCÁNER INTERACTIVO 35 VALORES', use_container_widt
     if resultados:
         df_res = pd.DataFrame(resultados)
         
-        # --- 3. TOP 3: SEMÁFORO DE COMPRA ---
-        st.subheader("🚥 TOP 3: SEÑALES DE COMPRA DEL DÍA")
+        # --- 3. TOP 3: SEÑALES DE COMPRA CON NOTICIAS ---
+        st.subheader("🚥 TOP 3: MEJORES SEÑALES DE COMPRA DEL DÍA")
+        # El criterio es el RSI más bajo (más sobrevendido)
         top_compra = df_res.sort_values("RSI").head(3)
         c_top = st.columns(3)
-        for idx, (_, r) in enumerate(top_compra.iterrows()):
+        
+        for idx, (index, r) in enumerate(top_compra.iterrows()):
             with c_top[idx]:
-                st.success(f"💎 {r['Ticker']} - {r['Precio']}€")
-                st.write(f"RSI: {r['RSI']} | Var 20d: {r['Var20']}%")
+                # Tarjeta de Éxito
+                with st.container(border=True):
+                    st.success(f"🥇 OPCIÓN {idx+1}: {r['Ticker']}")
+                    st.metric("Precio Actual", f"{r['Precio']}€", f"{r['Var20']}% (20d)")
+                    st.write(f"**Fuerza RSI:** {r['RSI']} (Oportunidad)")
+                    
+                    # Botón de Noticias específico para el Top 3
+                    nombre_top = r['Ticker'].split('.')[0]
+                    st.link_button(f"📰 Ver Noticias de {nombre_top}", 
+                                   f"https://www.google.com/search?q={nombre_top}+noticias+bolsa&tbm=nws",
+                                   use_container_width=True)
 
         st.divider()
 
         # --- 4. DESGLOSE INTERACTIVO DE LOS 35 ---
         st.subheader("📊 Radiografía Completa de los 35 Valores")
-        
-        # Creamos columnas para que no sea una lista infinita
         cols = st.columns(3)
         
         for idx, item in enumerate(resultados):
             with cols[idx % 3]:
-                # Cada valor es un Expander (Acordeón) que puedes pinchar
                 with st.expander(f"{item['Sem']} | {item['Ticker']} - {item['Precio']}€"):
-                    # Datos Clave
                     c1, c2 = st.columns(2)
                     with c1:
-                        st.metric("Precio Actual", f"{item['Precio']}€")
-                        st.write(f"**Fuerza RSI:** {item['RSI']}")
+                        st.write(f"**RSI:** {item['RSI']}")
+                        st.write(f"**Var 20d:** {item['Var20']}%")
                     with c2:
-                        st.metric("Tendencia 20d", f"{item['Var20']}%")
                         name_link = item['Ticker'].split('.')[0]
-                        st.link_button("📰 Ver Noticias", f"https://www.google.com/search?q={name_link}+noticias+bolsa&tbm=nws")
+                        st.link_button("📰 Noticias", f"https://www.google.com/search?q={name_link}+noticias+bolsa&tbm=nws")
                     
-                    # Gráfico Interactivo de Velas (Últimos 20 días)
+                    # Gráfico de Velas Interactivo
                     df_plot = item['df'].tail(20)
                     fig = go.Figure(data=[go.Candlestick(
-                        x=df_plot.index,
-                        open=df_plot['Open'],
-                        high=df_plot['High'],
-                        low=df_plot['Low'],
-                        close=df_plot['Close'],
-                        name="Velas"
+                        x=df_plot.index, open=df_plot['Open'], high=df_plot['High'],
+                        low=df_plot['Low'], close=df_plot['Close']
                     )])
-                    fig.update_layout(
-                        height=250, 
-                        margin=dict(l=0, r=0, t=0, b=0),
-                        xaxis_rangeslider_visible=False,
-                        template="plotly_white"
-                    )
+                    fig.update_layout(height=200, margin=dict(l=0,r=0,t=0,b=0), xaxis_rangeslider_visible=False)
                     st.plotly_chart(fig, use_container_width=True)
 
     else:
