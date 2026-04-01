@@ -1,76 +1,77 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import plotly.graph_objects as go # Para gráficos más profesionales
+import plotly.graph_objects as go
 
 st.set_page_config(page_title="Miguel Terminal PRO", layout="wide")
-
-# --- ESTILOS ---
-st.markdown("""<style>.main { background-color: #f5f7f9; }</style>""", unsafe_allow_html=True)
-
-st.title("🚀 Terminal Inteligente IBEX 35 - MIGUEL")
 
 # --- 1. LISTA Y DATOS ---
 ibex_35 = ["ANA.MC", "ACX.MC", "ACS.MC", "AENA.MC", "AMS.MC", "MRL.MC", "BBVA.MC", "BKT.MC", "CABK.MC", "ENG.MC", "ELE.MC", "FER.MC", "FDR.MC", "GRF.MC", "IAG.MC", "IBE.MC", "ITX.MC", "IDR.MC", "COL.MC", "LOG.MC", "MAP.MC", "MEL.MC", "NTGY.MC", "PUIG.MC", "RED.MC", "ROVI.MC", "SAB.MC", "SAN.MC", "SCYR.MC", "TEF.MC", "UNI.MC"]
 
 @st.cache_data(ttl=600)
-def cargar_datos(tickers):
+def cargar_datos_totales(tickers):
     return yf.download(tickers, period="6mo")['Close']
 
+# --- INTERFAZ PRINCIPAL ---
+st.title("🚀 Terminal Inteligente IBEX 35")
+
+# Selector de Acción (El motor que cambia todo)
+ticker_seleccionado = st.selectbox("🔍 SELECCIONA UNA EMPRESA PARA ANALIZAR:", ibex_35)
+
 try:
-    df_precios = cargar_datos(ibex_35)
+    # Obtener datos de la empresa seleccionada
+    datos_completos = cargar_datos_totales(ibex_35)
+    precios_ticker = datos_completos[ticker_seleccionado].dropna()
     
-    # --- 2. CÁLCULO DE RSI Y SEÑALES ---
-    resumen = []
-    for ticker in ibex_35:
-        if ticker in df_precios.columns:
-            p = df_precios[ticker].dropna()
-            if len(p) > 14:
-                delta = p.diff(); g = (delta.where(delta > 0, 0)).rolling(14).mean(); l = (-delta.where(delta < 0, 0)).rolling(14).mean()
-                rsi = 100 - (100 / (1 + g/l))
-                u_p = p.iloc[-1]; u_r = rsi.iloc[-1]
-                est = "🟢 COMPRA" if u_r < 35 else ("🔴 RIESGO" if u_r > 65 else "⚪ NEUTRO")
-                resumen.append({"Ticker": ticker, "Precio": u_p, "RSI": u_r, "Estado": est})
+    # 2. CÁLCULO DE RSI
+    delta = precios_ticker.diff()
+    ganancia = (delta.where(delta > 0, 0)).rolling(14).mean()
+    perdida = (-delta.where(delta < 0, 0)).rolling(14).mean()
+    rsi = 100 - (100 / (1 + ganancia/perdida))
+    u_rsi = rsi.iloc[-1]
+    u_precio = precios_ticker.iloc[-1]
+
+    # --- 3. DISEÑO DE FICHA INDIVIDUAL ---
+    st.divider()
     
-    df_resumen = pd.DataFrame(resumen)
+    # Fila de Cabecera: Precio y Riesgo
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Precio Actual", f"{u_precio:.2f} €")
+    c2.metric("RSI (14d)", f"{u_rsi:.2f}")
+    
+    if u_rsi < 35:
+        c3.success("VALORACIÓN: COMPRA ✅")
+    elif u_rsi > 65:
+        c3.error("VALORACIÓN: RIESGO ⚠️")
+    else:
+        c3.info("VALORACIÓN: NEUTRO ⚪")
 
-    # --- 3. DISEÑO DE LA APP (COLUMNAS) ---
-    col1, col2 = st.columns([1, 2])
+    # Fila de Gráfico y Noticias
+    col_grafico, col_noticias = st.columns([2, 1])
 
-    with col1:
-        st.subheader("💡 Señales Actuales")
-        st.dataframe(df_resumen, use_container_width=True, height=400)
-        
-        # --- ESTADO DE RIESGO GLOBAL ---
-        riesgo_medio = df_resumen['RSI'].mean()
-        st.metric("RSI Medio IBEX", f"{riesgo_medio:.2f}", delta_color="inverse")
-        if riesgo_medio > 60: st.error("⚠️ MERCADO SOBRECALENTADO")
-        elif riesgo_medio < 40: st.success("📉 OPORTUNIDAD GENERAL")
-
-    with col2:
-        # --- ESQUEMA GRÁFICO ANIMADO (Selector) ---
-        st.subheader("📈 Análisis Gráfico")
-        seleccionado = st.selectbox("Selecciona acción para gráfico:", ibex_35)
-        
+    with col_grafico:
+        st.subheader(f"📈 Evolución de {ticker_seleccionado}")
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df_precios.index, y=df_precios[seleccionado], mode='lines', name='Precio'))
-        fig.update_layout(template="plotly_white", margin=dict(l=20, r=20, t=20, b=20), height=300)
+        fig.add_trace(go.Scatter(x=precios_ticker.index, y=precios_ticker, mode='lines', name='Precio', line=dict(color='#007bff')))
+        fig.update_layout(template="plotly_white", height=400, margin=dict(l=0, r=0, t=0, b=0))
         st.plotly_chart(fig, use_container_width=True)
 
-        # --- SECCIÓN DE NOTICIAS ---
-        st.subheader("📰 Últimas Noticias")
-        ticker_news = yf.Ticker(seleccionado)
-        news = ticker_news.news[:3] # Cogemos las 3 últimas
-        for n in news:
-            with st.expander(n['title']):
-                st.write(f"Fuente: {n['publisher']}")
-                st.markdown(f"[Leer noticia completa]({n['link']})")
+    with col_noticias:
+        st.subheader("📰 Noticias Recientes")
+        obj_ticker = yf.Ticker(ticker_seleccionado)
+        noticias = obj_ticker.news[:4] # 4 noticias principales
+        if noticias:
+            for n in noticias:
+                st.markdown(f"**[{n['title']}]({n['link']})**")
+                st.caption(f"Fuente: {n['publisher']}")
+                st.write("---")
+        else:
+            st.write("No hay noticias recientes para este valor.")
 
 except Exception as e:
-    st.error(f"Error: {e}")
+    st.error(f"Error cargando ficha: {e}")
 
-# --- SIDEBAR ---
+# Sidebar con resumen rápido
 with st.sidebar:
-    st.header("💰 CALCULADORA")
-    capital = st.number_input("Inversión (€):", value=1000)
-    st.info(f"Con {capital}€ podrías diversificar en las 🟢 COMPRA.")
+    st.header("📊 Resumen del Mercado")
+    st.write("Usa el buscador central para ver el análisis detallado de cada empresa.")
